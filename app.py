@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 SLSU - Judge Guillermo Eleazar | Facility & Equipment Request System
-Single-file Flask application.  Database: a local SQLite file (rfu.db).
+Single-file Flask application.  Database: Supabase (PostgreSQL) when DATABASE_URL is set,
+otherwise a local SQLite file (rfu.db) so you can still test on your own computer.
 
 SETUP (local)
     pip install -r requirements.txt
+    copy .env.example to .env and put your Supabase connection string in DATABASE_URL
     python APP_1.py                -> open http://127.0.0.1:5000
-SETUP (Render)  Start command: gunicorn APP_1:app   |  Environment: SECRET_KEY
+SETUP (Render)  Start command: gunicorn APP_1:app   |  Environment: DATABASE_URL, SECRET_KEY
 
 FIRST LOGIN
     username: admin    password: admin123   (you MUST change it on first login)
@@ -14,7 +16,7 @@ FIRST LOGIN
 
 OPTIONAL ENVIRONMENT VARIABLES
     Equipment: the admin adds all equipment and quantities in the "Equipment Stock" tab.
-    SECRET_KEY=...  RFU_ADMIN_PASSWORD=...  TZ_HOURS=8  (RFU_DB/HOST/PORT for local use)
+    DATABASE_URL=postgresql://...  SECRET_KEY=...  RFU_ADMIN_PASSWORD=...  TZ_HOURS=8  (RFU_DB/HOST/PORT for local use)
 For real deployment use HTTPS and a WSGI server, e.g.:  pip install waitress ; waitress-serve --port=8000 app:app
 """
 import os, io, re, sys, csv, json, time, base64, secrets, sqlite3
@@ -40,6 +42,10 @@ except ImportError:
     pass
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+DATABASE_URL = (os.environ.get("DATABASE_URL") or "").strip()
+USE_PG = bool(DATABASE_URL)
+if USE_PG:
+    import psycopg2, psycopg2.extras
 DB_PATH = os.environ.get("RFU_DB", os.path.join(BASE, "rfu.db"))
 FACILITIES = ["Audio Visual Room (AVR)", "Administration Building Lobby", "Covered Court", "Classroom"]
 OLD_DEFAULTS = [("Sound System", 2), ("Table", 30), ("Chair", 200), ("Microphone", 6), ("Projector", 3)]  # removed automatically once
@@ -73,11 +79,47 @@ CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, request_id INTEGER NOT 
   name TEXT NOT NULL, qty INTEGER NOT NULL);
 """
 
+# PostgreSQL / Supabase version of the same schema (SERIAL ids, case-insensitive equipment names, RLS on)
+SCHEMA_PG = ("CREATE EXTENSION IF NOT EXISTS citext;\n"
+             + SCHEMA.replace("id INTEGER PRIMARY KEY", "id SERIAL PRIMARY KEY").replace("name TEXT PRIMARY KEY COLLATE NOCASE", "name CITEXT PRIMARY KEY")
+             + "".join("ALTER TABLE %s ENABLE ROW LEVEL SECURITY;\n" % t for t in ("users", "inventory", "requests", "meta", "items", "notifications")))
+assert "SERIAL" in SCHEMA_PG and "CITEXT" in SCHEMA_PG and "NOCASE" not in SCHEMA_PG
+
+_NOCASE = re.compile(r"([A-Za-z_][\w.]*)\s*=\s*\?\s+COLLATE\s+NOCASE", re.I)
+def pg_sql(sql):
+    """Translate the app's SQLite-style SQL to PostgreSQL."""
+    sql = _NOCASE.sub(r"LOWER(\1) = LOWER(?)", sql)
+    return sql.replace("%", "%%").replace("?", "%s")
+
+class _Res:
+    def __init__(self, cur, lastrowid=None): self.cur, self.lastrowid = cur, lastrowid
+    def fetchall(self): return self.cur.fetchall()
+    def fetchone(self): return self.cur.fetchone()
+
+class PGConn:
+    """Thin wrapper so the rest of the app can keep using db().execute(sql, params)."""
+    def __init__(self):
+        kw = {} if ("sslmode" in DATABASE_URL or "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL) else {"sslmode": "require"}
+        self.c = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor, connect_timeout=10, **kw)
+    def execute(self, sql, params=()):
+        cur = self.c.cursor(); s_ = pg_sql(sql)
+        ins = bool(re.match(r"\s*INSERT\s+INTO\s+(users|requests|items)\b", s_, re.I))
+        if ins: s_ += " RETURNING id"
+        try: cur.execute(s_, params)
+        except Exception:
+            self.c.rollback(); raise
+        return _Res(cur, cur.fetchone()[0] if ins else None)
+    def commit(self): self.c.commit()
+    def close(self): self.c.close()
+
 def db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys=ON")
+        if USE_PG:
+            g.db = PGConn()
+        else:
+            g.db = sqlite3.connect(DB_PATH)
+            g.db.row_factory = sqlite3.Row
+            g.db.execute("PRAGMA foreign_keys=ON")
     return g.db
 
 @app.teardown_appcontext
@@ -135,7 +177,9 @@ def dt12(s_):
 
 def _migrate():
     """Older databases: add the new 'return_date' column (date the facility/equipment will be returned)."""
-    if "return_date" not in [c["name"] for c in q("PRAGMA table_info(requests)")]:
+    if USE_PG:
+        ex("ALTER TABLE requests ADD COLUMN IF NOT EXISTS return_date TEXT")
+    elif "return_date" not in [c["name"] for c in q("PRAGMA table_info(requests)")]:
         ex("ALTER TABLE requests ADD COLUMN return_date TEXT")
     ex("UPDATE requests SET return_date=event_date WHERE return_date IS NULL")
 
@@ -152,7 +196,10 @@ def _ensure_admin():
 
 def init_db():
     with app.app_context():
-        db().executescript(SCHEMA)
+        if USE_PG:       # one process creates the tables at a time (several gunicorn workers start together)
+            cur = db().c.cursor(); cur.execute("SELECT pg_advisory_xact_lock(7242026)"); cur.execute(SCHEMA_PG); db().commit()
+        else:
+            db().executescript(SCHEMA)
         for step in (_migrate, _remove_old_defaults, _ensure_admin):
             try: step()
             except Exception as err: print("init_db note (another worker may have done this already):", err)
@@ -1016,8 +1063,17 @@ CREATE TABLE IF NOT EXISTS damage_updates(id INTEGER PRIMARY KEY, report_id INTE
 def rp_init():
     with app.app_context():
         try:
-            db().executescript(RP_SCHEMA)
+            if USE_PG:
+                cur = db().c.cursor(); cur.execute("SELECT pg_advisory_xact_lock(7242027)")
+                cur.execute(RP_SCHEMA.replace("id INTEGER PRIMARY KEY", "id SERIAL PRIMARY KEY")
+                            + "".join("ALTER TABLE %s ENABLE ROW LEVEL SECURITY;\n" % t for t in ("damage_reports", "damage_updates")))
+                db().commit()
+            else:
+                db().executescript(RP_SCHEMA)
         except Exception as err:
+            if USE_PG:
+                try: db().c.rollback()
+                except Exception: pass
             print("rp_init note (another worker may have done this already):", err)
 
 ICONS.update({
@@ -1595,6 +1651,16 @@ b.onclick=function(){var f=[].filter.call(s.options,function(x){return x.value!=
 if(typeof READY!=='undefined'&&READY)window.paint()})();</script>"""
 RP_EQ_CSS = """
 .erow.eo input[name=item_other]{flex:2 1 160px!important;order:-1!important;border-color:var(--pr)}
+html[data-theme=dark] table.rpm tr{background:rgba(30,44,58,.92);border-color:var(--bd)}
+html[data-theme=dark] table.rpm td{border-bottom-color:var(--bd);color:var(--tx)}
+html[data-theme=dark] table.rpm td::before{color:#9fb0c0}
+html[data-theme=dark] table.rpm td .mu,html[data-theme=dark] table.rpm .rpc .mu{color:#9fb0c0}
+html[data-theme=dark] table.rpm td a{color:#8ab4ff}
+html[data-theme=dark] .erow .eb{background:#1e2c3a;color:#8ab4ff;border-color:#4a82cf}
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#1e2c3a;color:var(--tx);border-color:var(--bd)}
+html[data-theme=dark] .btn.s{background:transparent;color:#8ab4ff;border-color:#4a82cf}
+html[data-theme=dark] .sc-bar b{color:var(--tx)}
+html[data-theme=dark] a.btn:not(.s),html[data-theme=dark] button:not(.s):not(.r):not(.gr):not(.eye):not(.lk):not(.x):not(.eb){color:#fff}
 .erow .eb{margin:0;padding:0 12px;min-height:40px;background:#fff;color:var(--pr);border:1px solid var(--pr);border-radius:6px;font-size:13px;font-weight:600;order:4}
 @media(max-width:700px){.erow.eo input[name=item_other]{flex:1 1 100%!important;order:1!important}.erow.eo input[name=item_qty]{order:2}.erow .eb{flex:1 1 auto;order:3;min-height:44px}.erow.eo button.r{order:4}}
 """
