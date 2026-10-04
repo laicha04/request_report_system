@@ -1,0 +1,6 @@
+Flask>=3.0
+gunicorn
+psycopg2-binary
+reportlab
+Pillow
+python-dotenv

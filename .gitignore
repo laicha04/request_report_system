@@ -1,0 +1,5 @@
+rfu.db
+rfu_secret.key
+.env
+__pycache__/
+*.pyc
