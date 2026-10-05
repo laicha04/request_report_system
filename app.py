@@ -1732,6 +1732,59 @@ _b = _b.replace("</style>" + RP_THEME_INIT, RP_FL_CSS + "</style>" + RP_THEME_IN
 _b = _b.replace("</body></html>", RP_FL_JS + "</body></html>", 1)
 T["base.html"] = _b
 
+# ---- 8. Glass look on every dashboard (admin, student, calendar, GSO damage dashboard) -----------------------------------
+RP_DASH_CSS = """
+body.dash{--ov:rgba(255,255,255,.12)}html[data-theme=dark] body.dash{--ov:rgba(8,14,20,.55)}
+body.dash .card,body.dash .wrap>p.mu,body.dash .who{background:rgba(8,22,15,.36)!important;border:1px solid rgba(255,255,255,.4)!important;box-shadow:0 12px 34px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+html[data-theme=dark] body.dash .card,html[data-theme=dark] body.dash .wrap>p.mu,html[data-theme=dark] body.dash .who{background:rgba(8,16,26,.5)!important;border-color:rgba(255,255,255,.3)!important}
+body.dash .wrap>p.mu{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.85);padding:10px 14px;border-radius:12px;font-size:13px}
+body.dash .card,body.dash .card h2,body.dash .card h3,body.dash .card h4,body.dash .card p,body.dash .card th,body.dash .card td,body.dash .card .mu,body.dash .card label:not(.fl),body.dash .card dt,body.dash .card dd,body.dash .card li,body.dash .card small,body.dash .who,body.dash .who *:not(a):not(button){color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 8px rgba(0,0,0,.4)}
+body.dash .card h2{font-weight:700}
+body.dash .card th,body.dash .card td{border-color:rgba(255,255,255,.28)!important}
+body.dash .card a:not(.btn):not(.nav):not(.on),body.dash .who a,body.dash .who button.lk{color:#cfe6ff!important;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+body.dash .card .b{text-shadow:none!important}
+body.dash .card input,body.dash .card select,body.dash .card textarea{background:rgba(255,255,255,.93)!important;color:#10202b!important;border:1px solid rgba(255,255,255,.9);text-shadow:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+body.dash .card input[type=checkbox],body.dash .card input[type=radio]{box-shadow:none}
+body.dash .card input::placeholder{color:#6b7a89}
+html[data-theme=dark] body.dash .card input,html[data-theme=dark] body.dash .card select,html[data-theme=dark] body.dash .card textarea{background:rgba(8,16,26,.62)!important;color:#fff!important;border-color:rgba(255,255,255,.45)}
+body.dash .card .btn.s,body.dash .card button.s{background:rgba(255,255,255,.93);color:#14417b!important;border-color:#fff;text-shadow:none}
+html[data-theme=dark] body.dash .card .btn.s,html[data-theme=dark] body.dash .card button.s{background:rgba(23,33,44,.92);color:#cfe3ff!important;border-color:rgba(255,255,255,.4)}
+body.dash .card button:not(.s):not(.eye){text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+body.dash .card .stat,body.dash .chips a{background:rgba(255,255,255,.14)!important;border-color:rgba(255,255,255,.4)!important;color:#fff!important}
+body.dash .card .stat b,body.dash .card .stat span{color:#fff!important}
+body.dash .chips a.on,body.dash .chips a:hover{background:#2d6a4f!important}
+body.dash .sc td,body.dash .cal td{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.3)!important}
+body.dash .sc td.off{background:rgba(0,0,0,.18)}body.dash .sc td:hover:not(.off){background:rgba(255,255,255,.22)}
+body.dash .sc th,body.dash .sc-leg,body.dash .sc-more,body.dash .dn{color:#fff!important}
+body.dash .sc-ev{background:rgba(255,255,255,.12)}
+body.dash table.rpm tr{background:rgba(255,255,255,.10)!important;border-color:rgba(255,255,255,.35)!important}
+body.dash table.rpm td::before{color:rgba(255,255,255,.82)!important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+body.dash .rp-code,body.dash .rp-photo,body.dash .rp-tl>*{background:rgba(255,255,255,.12)!important;border-color:rgba(255,255,255,.35)!important}
+body.dash .wrap>p>a,body.dash .wrap>a{color:#fff!important;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.6)}
+body.dash .tabs a:not(.on){background:rgba(255,255,255,.93)!important;color:#14417b!important}
+@supports selector(:has(*)){
+ body.dash .card label.fl{color:#4b5b6b!important;text-shadow:none!important;font-weight:600!important}
+ body.dash .card label.fl.up,body.dash .card label.fl:has(+ input:focus),body.dash .card label.fl:has(+ select:focus),body.dash .card label.fl:has(+ textarea:focus),body.dash .card label.fl:has(+ .pw input:focus),body.dash .card label.fl:has(+ input:not(:placeholder-shown)),body.dash .card label.fl:has(+ textarea:not(:placeholder-shown)),body.dash .card label.fl:has(+ .pw input:not(:placeholder-shown)){color:#fff!important;font-weight:700!important;text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.6)!important}
+ html[data-theme=dark] body.dash .card label.fl{color:#b8c7d6!important}
+ html[data-theme=dark] body.dash .card label.fl.up,html[data-theme=dark] body.dash .card label.fl:has(+ input:focus),html[data-theme=dark] body.dash .card label.fl:has(+ select:focus),html[data-theme=dark] body.dash .card label.fl:has(+ textarea:focus),html[data-theme=dark] body.dash .card label.fl:has(+ input:not(:placeholder-shown)),html[data-theme=dark] body.dash .card label.fl:has(+ textarea:not(:placeholder-shown)){color:#67e8f9!important}
+}
+"""
+_b = T["base.html"]
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_DASH_CSS + "</style>" + RP_THEME_INIT, 1)
+T["base.html"] = _b
+
+# ---- 9. No browser auto-fill on Sign In / Create an account ---------------------------------------------------------------
+RP_NOFILL_JS = """<script>(function(){var f=document.querySelector('form.auth');if(!f||!f.querySelector('[name=username]')||/forgot/.test(location.pathname))return;
+f.setAttribute('autocomplete','off');var ins=[].slice.call(f.querySelectorAll('input')).filter(function(i){return i.type!=='hidden'});
+ins.forEach(function(i){i.setAttribute('autocomplete',i.type==='password'?'new-password':'off');i.setAttribute('autocapitalize','off');i.setAttribute('spellcheck','false');i.readOnly=true;
+var u=function(){i.readOnly=false};['focus','mousedown','touchstart'].forEach(function(e){i.addEventListener(e,u)});
+['keydown','paste','input'].forEach(function(e){i.addEventListener(e,function(ev){if(ev.isTrusted)i.dataset.t='1'})})});
+function wipe(){ins.forEach(function(i){if(!i.dataset.t&&i.value!==i.defaultValue)i.value=i.defaultValue})}
+[50,300,800,1600,3000].forEach(function(t){setTimeout(wipe,t)});window.addEventListener('pageshow',wipe)})();</script>"""
+_b = T["base.html"]
+_b = _b.replace("</body></html>", RP_NOFILL_JS + "</body></html>", 1)
+T["base.html"] = _b
+
 # ---- 3. Backup & export of all data (admin) -----------------------------------------------------------------------
 RP_BK = [("requests", "id,rfu_no,user_id,requester,dept,event,event_date,t1,t2,return_date,attendees,facilities,head,status,remarks,created_at,returned_at", "requests"),
          ("request_items", "id,request_id,name,qty", "items"),
