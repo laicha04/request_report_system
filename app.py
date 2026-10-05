@@ -1293,15 +1293,13 @@ def rp_gzip(resp):
         pass
     return resp
 
-# Small "Report broken equipment" button, top-right under the header, on the sign-in page only (login page code is not edited).
+# "Report broken equipment?" prompt + "Click here" button, placed under the sign-in box (login page code is not edited).
 @app.after_request
 def rp_login_button(resp):
     try:
         if request.endpoint == "login" and resp.status_code == 200 and resp.mimetype == "text/html":
-            btn = ('<div style="text-align:right;padding:10px clamp(8px,2vw,22px) 0"><a href="%s" style="display:inline-block;background:#b45309;color:#fff;'
-                   'padding:6px 14px;border-radius:18px;font:600 13px system-ui,sans-serif;text-decoration:none;box-shadow:0 3px 10px rgba(0,0,0,.25)">'
-                   '&#9888; Report broken equipment</a></div>' % url_for("rp_form"))
-            resp.set_data(resp.get_data(as_text=True).replace("</header>", "</header>" + btn, 1))
+            btn = ('<div class="rp-lr"><div class="rp-lq">Report broken equipment?</div><a class="rp-lb" href="%s">Click here</a></div>' % url_for("rp_form"))
+            resp.set_data(resp.get_data(as_text=True).replace("</form>", btn + "</form>", 1))
     except Exception:
         pass
     return resp
@@ -1671,6 +1669,67 @@ _s = _s[:_j] + RP_EQ + _s[_j:]
 T["student.html"] = _s
 _b = T["base.html"]
 _b = _b.replace("</style>" + RP_THEME_INIT, RP_EQ_CSS + "</style>" + RP_THEME_INIT, 1)
+T["base.html"] = _b
+
+# ---- 6. Transparent sign-in / sign-up / change-password boxes (letters and buttons stay readable) + report prompt ----------
+RP_AUTH_CSS = """
+/* glass panel: the photo shows through (blurred, lightly tinted); white letters with a soft shadow stay readable in light AND dark mode */
+.authbg .card.auth:not(.rp-narrow){position:relative;background:rgba(8,22,15,.30)!important;border:1px solid rgba(255,255,255,.45)!important;border-radius:16px;box-shadow:0 12px 36px rgba(0,0,0,.35)!important;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.authbg .card.auth:not(.rp-narrow) h2,.authbg .card.auth:not(.rp-narrow) p,.authbg .card.auth:not(.rp-narrow) a:not(.btn),.authbg .card.auth:not(.rp-narrow) label{color:#fff!important;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.55)}
+.authbg .card.auth:not(.rp-narrow) h2{font-size:30px;font-weight:800}
+.authbg .card.auth:not(.rp-narrow) input{background:rgba(255,255,255,.93)!important;color:#10202b!important;font-weight:600;border:1px solid rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(0,0,0,.3);text-shadow:none}
+.authbg .card.auth:not(.rp-narrow) .fe{color:#ffc2b8!important;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.9)}
+.authbg .card.auth:not(.rp-narrow) .msg{background:rgba(255,255,255,.93);color:#10202b;text-shadow:none;border-radius:8px}
+.authbg .card.auth:not(.rp-narrow) button:not(.eye){box-shadow:0 4px 12px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.55)}
+.authbg .card.auth:not(.rp-narrow) .btn.s{background:rgba(255,255,255,.93);color:#14417b!important;text-shadow:none;border-color:#fff}
+.authbg .card.auth:not(.rp-narrow) .eye{color:#14417b;text-shadow:none}
+html[data-theme=dark] .authbg .card.auth:not(.rp-narrow){background:rgba(8,16,26,.42)!important;border-color:rgba(255,255,255,.35)!important}
+html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) input{background:rgba(8,16,26,.6)!important;color:#fff!important;border-color:rgba(255,255,255,.5)}
+html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) .eye{color:#9bd0ff}
+html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) .btn.s{background:rgba(23,33,44,.92);color:#cfe3ff!important}
+.rp-lr{position:absolute;right:20px;bottom:16px;text-align:right}
+.rp-lq{color:#fff;font:700 13px/1.3 system-ui,sans-serif;margin-bottom:5px;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.55)}
+.rp-lb{display:inline-block;background:#b45309;color:#fff!important;padding:7px 20px;border-radius:20px;font:700 13px system-ui,sans-serif;text-decoration:none;text-shadow:none!important;border:1px solid rgba(255,255,255,.7);box-shadow:0 4px 12px rgba(0,0,0,.45)}
+.rp-lb:hover{background:#c2610c;opacity:1}
+@media(max-width:560px){.rp-lr{position:static;margin-top:16px}}
+"""
+_b = T["base.html"]
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_AUTH_CSS + "</style>" + RP_THEME_INIT, 1)
+T["base.html"] = _b
+
+# ---- 7. Floating-label inputs with an animated glowing border (every input on the site; CSS-only, labels are tagged by a small script) ----
+RP_FL_CSS = """
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]),select,textarea{transition:border-color .25s ease,box-shadow .25s ease,background-color .25s ease}
+input:focus,select:focus,textarea:focus{border-color:#22d3ee!important;box-shadow:0 0 0 3px rgba(34,211,238,.22),0 0 18px rgba(34,211,238,.5)!important;outline:none}
+@supports selector(:has(*)){
+ label.fl{display:block;width:max-content;max-width:calc(100% - 20px);height:16px;margin:0 0 -16px!important;padding:0;position:relative;z-index:3;pointer-events:none;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;white-space:nowrap;font-size:15px!important;font-weight:500!important;line-height:16px;color:#5b6b7b!important;text-shadow:none!important;background:none!important;transform:translate(14px,37px);transform-origin:left top;transition:transform .24s cubic-bezier(.2,.8,.3,1),font-size .24s ease,color .2s ease}
+ label.fl + input,label.fl + select,label.fl + textarea,label.fl + .pw{margin-top:22px!important}
+ .g>*,form>div,.wrap .card>div{min-width:0}
+ label.fl + input,label.fl + select{height:46px}label.fl + .pw input{height:46px}
+ label.fl:has(+ textarea){transform:translate(14px,34px)}
+ label.fl.up,label.fl:has(+ input:focus),label.fl:has(+ select:focus),label.fl:has(+ textarea:focus),label.fl:has(+ .pw input:focus),
+ label.fl:has(+ input:not(:placeholder-shown)),label.fl:has(+ textarea:not(:placeholder-shown)),label.fl:has(+ .pw input:not(:placeholder-shown)){transform:translate(2px,1px);font-size:12px!important;font-weight:700!important;color:#0e7490!important}
+ label.fl:has(+ input:focus),label.fl:has(+ select:focus),label.fl:has(+ textarea:focus),label.fl:has(+ .pw input:focus){color:#0891b2!important}
+ label.fl + input::placeholder,label.fl + textarea::placeholder{color:transparent}
+ label.fl:has(+ input:focus) + input::placeholder,label.fl.up + input::placeholder,label.fl.up + textarea::placeholder,label.fl:has(+ textarea:focus) + textarea::placeholder{color:#8a97a5}
+ html[data-theme=dark] label.fl{color:#9fb0c0!important}
+ html[data-theme=dark] label.fl.up,html[data-theme=dark] label.fl:has(+ input:focus),html[data-theme=dark] label.fl:has(+ select:focus),html[data-theme=dark] label.fl:has(+ textarea:focus),html[data-theme=dark] label.fl:has(+ .pw input:focus),
+ html[data-theme=dark] label.fl:has(+ input:not(:placeholder-shown)),html[data-theme=dark] label.fl:has(+ textarea:not(:placeholder-shown)),html[data-theme=dark] label.fl:has(+ .pw input:not(:placeholder-shown)){color:#67e8f9!important}
+ /* sign-in style pages: letters are white with a soft shadow, resting label dark so it reads inside the white field */
+ .authbg .card.auth:not(.rp-narrow) label.fl{color:#4b5b6b!important;text-shadow:none!important;font-weight:600!important}
+ .authbg .card.auth:not(.rp-narrow) label.fl.up,.authbg .card.auth:not(.rp-narrow) label.fl:has(+ input:focus),.authbg .card.auth:not(.rp-narrow) label.fl:has(+ .pw input:focus),.authbg .card.auth:not(.rp-narrow) label.fl:has(+ input:not(:placeholder-shown)),.authbg .card.auth:not(.rp-narrow) label.fl:has(+ .pw input:not(:placeholder-shown)){color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.6)!important;font-weight:700!important}
+ html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) label.fl{color:#b8c7d6!important}
+ html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) label.fl.up,html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) label.fl:has(+ input:focus),html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) label.fl:has(+ .pw input:focus),html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) label.fl:has(+ input:not(:placeholder-shown)),html[data-theme=dark] .authbg .card.auth:not(.rp-narrow) label.fl:has(+ .pw input:not(:placeholder-shown)){color:#67e8f9!important}
+}
+"""
+RP_FL_JS = """<script>(function(){function pick(n){if(!n)return null;if(n.classList&&n.classList.contains('pw'))n=n.querySelector('input');if(!n||!/^(INPUT|SELECT|TEXTAREA)$/.test(n.tagName))return null;
+var t=(n.type||'').toLowerCase();if(n.tagName==='INPUT'&&/^(hidden|checkbox|radio|file|submit|button|image|reset|range|color)$/.test(t))return null;return n}
+function go(){try{document.querySelectorAll('label').forEach(function(l){if(l.classList.contains('fl')||l.closest('.ck,.erow,.tp,.modalbg,.side'))return;var f=pick(l.nextElementSibling);if(!f)return;
+var t=(f.type||'').toLowerCase();if(f.tagName==='SELECT'||/^(date|month|time|datetime-local|week)$/.test(t)||(f.placeholder&&f.placeholder.trim()))l.classList.add('up');else if(!f.placeholder)f.placeholder=' ';l.classList.add('fl')})}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(go,0)});else setTimeout(go,0)})();</script>"""
+_b = T["base.html"]
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_FL_CSS + "</style>" + RP_THEME_INIT, 1)
+_b = _b.replace("</body></html>", RP_FL_JS + "</body></html>", 1)
 T["base.html"] = _b
 
 # ---- 3. Backup & export of all data (admin) -----------------------------------------------------------------------
