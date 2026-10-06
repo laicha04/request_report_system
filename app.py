@@ -1042,9 +1042,9 @@ import smtplib, threading
 from email.message import EmailMessage
 
 RP_STATUSES = ("New", "In Progress", "Resolved", "Rejected")
-RP_WHERE = {"new": "status='New'", "progress": "status='In Progress'", "resolved": "status='Resolved'",
+RP_WHERE = {"new": "status!='Resolved'", "progress": "status='In Progress'", "resolved": "status='Resolved'",
             "rejected": "status='Rejected'", "all": "1=1"}
-RP_TITLES = {"new": "New reports", "progress": "In progress", "resolved": "Resolved reports", "rejected": "Rejected / closed reports",
+RP_TITLES = {"new": "Not yet resolved", "progress": "In progress", "resolved": "Resolved reports", "rejected": "Rejected / closed reports",
              "all": "All reports", "summary": "Summary"}
 RP_PROBLEMS = ["Broken / damaged", "Not working", "Missing parts", "Leaking / electrical / safety hazard", "Other"]
 RP_COMMON = ["Chair", "Table", "Projector", "Microphone", "Sound system", "Aircon", "Electric fan", "Computer", "Light / bulb",
@@ -1199,8 +1199,8 @@ def rp_summary():
     for r in q("SELECT created_at, resolved_at FROM damage_reports WHERE status='Resolved' AND resolved_at IS NOT NULL"):
         try: ds.append((datetime.strptime(r["resolved_at"], "%Y-%m-%d %H:%M") - datetime.strptime(r["created_at"], "%Y-%m-%d %H:%M")).total_seconds() / 86400)
         except Exception: pass
-    top = lambda col: [(r[1], r[2]) for r in q("SELECT LOWER(%s) k, MIN(%s) n, COUNT(*) c FROM damage_reports WHERE status!='Rejected' GROUP BY LOWER(%s) ORDER BY c DESC LIMIT 8" % (col, col, col))]
-    return dict(urgent_open=q1("SELECT COUNT(*) FROM damage_reports WHERE urgent=1 AND status IN ('New','In Progress')")[0],
+    top = lambda col: [(r[1], r[2]) for r in q("SELECT LOWER(%s) k, MIN(%s) n, COUNT(*) c FROM damage_reports GROUP BY LOWER(%s) ORDER BY c DESC LIMIT 8" % (col, col, col))]
+    return dict(urgent_open=q1("SELECT COUNT(*) FROM damage_reports WHERE urgent=1 AND status!='Resolved'")[0],
                 avg_days=round(sum(ds) / len(ds), 1) if ds else None, top_items=top("item"), top_locs=top("location"),
                 months=[(r[0], r[1]) for r in q("SELECT SUBSTR(created_at,1,7) m, COUNT(*) c FROM damage_reports GROUP BY SUBSTR(created_at,1,7) ORDER BY m DESC LIMIT 6")])
 
@@ -1216,7 +1216,7 @@ def gso_dash():
         if qs:
             sql += " AND (LOWER(ticket) LIKE ? OR LOWER(item) LIKE ? OR LOWER(location) LIKE ? OR LOWER(reporter) LIKE ? OR LOWER(description) LIKE ?)"
             args = ["%" + qs.lower() + "%"] * 5
-        sql += " ORDER BY urgent DESC, id DESC" if tab in ("new", "progress") else " ORDER BY id DESC"
+        sql += " ORDER BY urgent DESC, id DESC" if tab == "new" else " ORDER BY id DESC"
         ctx.update(rows=q(sql, *args), qs=qs)
     return render_template("gso_dash.html", **ctx)
 
@@ -1248,6 +1248,30 @@ def gso_update(rid):
     flash("Report %s updated." % r["ticket"], "ok")
     return redirect(url_for("gso_view", rid=rid))
 
+@app.route("/gso/report/<int:rid>/resolve", methods=["POST"])
+@admin_required
+def gso_resolve(rid):
+    r = q1("SELECT %s FROM damage_reports WHERE id=?" % RP_COLS, rid)
+    if not r: abort(404)
+    if r["status"] != "Resolved":
+        n = now_s()
+        ex("UPDATE damage_reports SET status='Resolved', updated_at=?, resolved_at=? WHERE id=?", n, n, rid)
+        ex("INSERT INTO damage_updates(report_id,status,note,public,by_name,created_at) VALUES(?,?,?,?,?,?)", rid, "Resolved", "Marked as resolved", 1, g.user["fullname"], n)
+    flash("Report %s was marked as resolved." % r["ticket"], "ok")
+    return redirect(url_for("gso_view", rid=rid))
+
+@app.route("/gso/report/<int:rid>/reopen", methods=["POST"])
+@admin_required
+def gso_reopen(rid):
+    r = q1("SELECT %s FROM damage_reports WHERE id=?" % RP_COLS, rid)
+    if not r: abort(404)
+    if r["status"] == "Resolved":
+        n = now_s()
+        ex("UPDATE damage_reports SET status='New', updated_at=?, resolved_at=NULL WHERE id=?", n, rid)
+        ex("INSERT INTO damage_updates(report_id,status,note,public,by_name,created_at) VALUES(?,?,?,?,?,?)", rid, "New", "Reopened", 1, g.user["fullname"], n)
+    flash("Report %s was reopened." % r["ticket"], "ok")
+    return redirect(url_for("gso_view", rid=rid))
+
 @app.route("/gso/report/<int:rid>/delete", methods=["POST"])
 @admin_required
 def gso_delete(rid):
@@ -1267,7 +1291,7 @@ def gso_photo(rid):
 @app.route("/gso/api/count")
 @admin_required
 def gso_count():
-    return jsonify(new=q1("SELECT COUNT(*) FROM damage_reports WHERE status='New'")[0])
+    return jsonify(new=q1("SELECT COUNT(*) FROM damage_reports WHERE status!='Resolved'")[0])
 
 @app.route("/gso/export.csv")
 @admin_required
@@ -1309,7 +1333,7 @@ def rp_login_button(resp):
 def rp_switch_pill(resp):
     try:
         if request.endpoint == "dashboard" and g.get("user") and g.user["role"] == "admin" and resp.status_code == 200 and resp.mimetype == "text/html":
-            n = q1("SELECT COUNT(*) FROM damage_reports WHERE status='New'")[0]
+            n = q1("SELECT COUNT(*) FROM damage_reports WHERE status!='Resolved'")[0]
             pill = ('<a href="%s" style="position:fixed;right:14px;bottom:18px;z-index:30;background:#b45309;color:#fff;padding:10px 16px;border-radius:24px;'
                     'font:600 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.3)">Damage Reports%s &rarr;</a>'
                     % (url_for("gso_dash"), (' <span style="background:#fff;color:#b45309;border-radius:10px;padding:1px 8px;margin-left:4px">%d new</span>' % n) if n else ""))
@@ -1361,7 +1385,7 @@ T["rp_macros.html"] = """
 {% macro gside(tab, cnt) %}<button type="button" class="menubtn" onclick="menu(true)" aria-label="Open menu">{{ ico('menu') }}</button><div id="sideBg" class="sideBg" onclick="menu(false)"></div>
 <nav id="side" class="side"><div class="sideuser"><div class="av">{{ (g.user.fullname or '?')[:1]|upper }}</div><div class="who2"><b>{{ g.user.fullname }}</b><span>Damage Reports</span></div><button type="button" class="x" onclick="menu(false)" aria-label="Close menu">{{ ico('x') }}</button></div>
 <div class="navlabel" style="--i:1">Damage reports</div>
-{% for k, label, n, ic in [('new','New',cnt['new'],'bell'),('progress','In Progress',cnt['progress'],'pending'),('resolved','Resolved',cnt['resolved'],'approved'),('rejected','Rejected',cnt['rejected'],'disapproved'),('all','All reports',cnt['all'],'list'),('summary','Summary',none,'report'),('backup','Backup &amp; export',none,'stock')] %}
+{% for k, label, n, ic in [('new','Not yet resolved',cnt['new'],'bell'),('resolved','Resolved',cnt['resolved'],'approved'),('all','All reports',cnt['all'],'list'),('summary','Summary',none,'report'),('backup','Backup & export',none,'stock')] %}
 <a class="nav {{ 'on' if tab == k }}" style="--i:{{ loop.index + 1 }}" href="{{ url_for('gso_backup') if k == 'backup' else url_for('gso_dash', tab=k) }}">{{ ico(ic) }}<span>{{ label }}</span>{% if n is not none %}<span class="cnt" {% if k == 'new' %}id="gsoNew"{% endif %}>{{ n }}</span>{% endif %}</a>{% endfor %}
 <div class="navlabel" style="--i:8">Other system</div>
 <a class="nav" style="--i:9" href="{{ url_for('dashboard') }}">{{ ico('stock') }}<span>Facility &amp; Equipment</span></a>
@@ -1411,13 +1435,13 @@ T["rp_track.html"] = """{% extends 'rp_base.html' %}{% block rp %}{% import 'rp_
 
 T["gso_dash.html"] = """{% extends 'rp_base.html' %}{% block rp %}{% import 'rp_macros.html' as rm %}{{ rm.gside(tab, cnt) }}
 {% if tab == 'summary' %}<div class="card"><h2>Damage Reports - Summary</h2>
-<div class="stats"><div class="stat"><b>{{ cnt['all'] }}</b><span>Total reports</span></div><div class="stat"><b>{{ cnt['new'] }}</b><span>New</span></div><div class="stat"><b>{{ cnt['progress'] }}</b><span>In progress</span></div><div class="stat"><b>{{ cnt['resolved'] }}</b><span>Resolved</span></div><div class="stat"><b>{{ urgent_open }}</b><span>Urgent &amp; still open</span></div><div class="stat"><b>{{ avg_days if avg_days is not none else '-' }}</b><span>Avg. days to resolve</span></div></div>
+<div class="stats"><div class="stat"><b>{{ cnt['all'] }}</b><span>Total reports</span></div><div class="stat"><b>{{ cnt['new'] }}</b><span>Not yet resolved</span></div><div class="stat"><b>{{ cnt['resolved'] }}</b><span>Resolved</span></div><div class="stat"><b>{{ urgent_open }}</b><span>Urgent &amp; still open</span></div><div class="stat"><b>{{ avg_days if avg_days is not none else '-' }}</b><span>Avg. days to resolve</span></div></div>
 <div class="rp-2"><div><h4>Most reported items</h4><table>{% for n, c in top_items %}<tr><td>{{ n }}</td><td style="text-align:right">{{ c }}</td></tr>{% else %}<tr><td class="mu">-</td></tr>{% endfor %}</table></div>
 <div><h4>Locations with most reports</h4><table>{% for n, c in top_locs %}<tr><td>{{ n }}</td><td style="text-align:right">{{ c }}</td></tr>{% else %}<tr><td class="mu">-</td></tr>{% endfor %}</table></div></div>
 <h4>Reports per month (last 6)</h4><table>{% for mo, c in months %}<tr><td>{{ mo }}</td><td style="text-align:right">{{ c }}</td></tr>{% else %}<tr><td class="mu">-</td></tr>{% endfor %}</table>
 <a class="btn" href="{{ url_for('gso_export') }}">Download CSV (Excel)</a></div>
 {% else %}<div class="card"><h2>{{ title }}</h2>
-{% if tab == 'new' %}<p class="mu">New reports from the public form appear here (urgent ones first). Open a report to acknowledge it, update its status and leave a note for the reporter.</p>{% endif %}
+{% if tab == 'new' %}<p class="mu">Reports from the public form appear here (urgent ones first). Open a report and press <b>Mark as resolved</b> once the item is fixed, so the GSO has a record.</p>{% endif %}
 <form method="get" class="rp-bar"><input type="hidden" name="tab" value="{{ tab }}"><input name="qs" value="{{ qs }}" placeholder="Search ticket, item, location, reporter"><button>Search</button>{% if qs %}<a class="btn s" href="{{ url_for('gso_dash', tab=tab) }}">Clear</a>{% endif %}</form>
 <div class="tb"><table><tr><th>Ticket</th><th>Item / problem</th><th>Location</th><th>Reported by</th><th>Filed</th><th>Status</th><th></th></tr>
 {% for x in rows %}<tr><td><a href="{{ url_for('gso_view', rid=x.id) }}">{{ x.ticket }}</a>{% if x.urgent %}<span class="rp-urg">URGENT</span>{% endif %}</td><td><b>{{ x.item }}</b><br><span class="mu">{{ x.problem }}</span></td><td>{{ x.location }}</td><td>{{ x.reporter }}<br><span class="mu">{{ x.contact }}</span></td><td>{{ x.created_at|dt12 }}</td><td>{{ rm.badge(x.status) }}</td><td><a class="btn sm" href="{{ url_for('gso_view', rid=x.id) }}">Open</a></td></tr>
@@ -1436,10 +1460,9 @@ T["gso_view.html"] = """{% extends 'rp_base.html' %}{% block rp %}{% import 'rp_
 <dt>Tracking code</dt><dd style="font-family:monospace">{{ r.ticket }}-{{ r.token }}</dd></dl>
 <p style="margin:14px 0 0"><a class="btn" href="{{ url_for('gso_pdf', rid=r.id) }}" target="_blank">Print report form (PDF)</a></p>
 {% if r.has_photo %}<h4 style="margin:16px 0 4px">Photo</h4><a href="{{ url_for('gso_photo', rid=r.id) }}" target="_blank"><img class="rp-photo" src="{{ url_for('gso_photo', rid=r.id) }}" alt="Photo of the damaged item"></a>{% endif %}</div>
-<div><div class="card"><h2>Update this report</h2><form method="post" action="{{ url_for('gso_update', rid=r.id) }}">{{ m.token() }}
-<label>Status</label><select name="status">{% for s in statuses %}<option {{ 'selected' if s == r.status }}>{{ s }}</option>{% endfor %}</select>
-<label>Note (required when rejecting)</label><textarea name="note" maxlength="600" placeholder="e.g. Technician assigned, will fix tomorrow."></textarea>
-<div class="ck" style="margin-top:8px"><label><input type="checkbox" name="public" value="1" checked> Show this note to the reporter on the tracking page</label></div><button>Save update</button></form></div>
+<div><div class="card"><h2>Status</h2><p style="margin:0 0 12px">{{ rm.badge(r.status) }}{% if r.resolved_at %} <span class="mu">on {{ r.resolved_at|dt12 }}</span>{% endif %}</p>
+{% if r.status == 'Resolved' %}<p class="mu" style="font-size:14px;margin-top:0">This item has been fixed. Made a mistake?</p><form method="post" action="{{ url_for('gso_reopen', rid=r.id) }}">{{ m.token() }}<button class="s">Reopen</button></form>
+{% else %}<p class="mu" style="font-size:14px;margin-top:0">Press the button after the item is repaired or replaced. This is kept as a record.</p><form method="post" action="{{ url_for('gso_resolve', rid=r.id) }}">{{ m.token() }}<button class="gr">&#10003; Mark as resolved</button></form>{% endif %}</div>
 <div class="card"><h2>History</h2><ul class="rp-tl">{% for u in ups %}<li>{{ rm.badge(u.status) }} {% if u.note %}{{ u.note }}{% endif %}<small>{{ u.created_at|dt12 }} &middot; {{ u.by_name }}{% if not u.public %} &middot; internal note{% endif %}</small></li>{% endfor %}</ul>
 <form method="post" action="{{ url_for('gso_delete', rid=r.id) }}" onsubmit="return confirm('Delete this report permanently? Use this only for spam or duplicates.')">{{ m.token() }}<button class="sm r">Delete report</button></form></div></div></div>{% endblock %}"""
 
@@ -1732,58 +1755,105 @@ _b = _b.replace("</style>" + RP_THEME_INIT, RP_FL_CSS + "</style>" + RP_THEME_IN
 _b = _b.replace("</body></html>", RP_FL_JS + "</body></html>", 1)
 T["base.html"] = _b
 
-# ---- 8. Glass look on every dashboard (admin, student, calendar, GSO damage dashboard) -----------------------------------
-RP_DASH_CSS = """
-body.dash{--ov:rgba(255,255,255,.12)}html[data-theme=dark] body.dash{--ov:rgba(8,14,20,.55)}
-body.dash .card,body.dash .wrap>p.mu,body.dash .who{background:rgba(8,22,15,.36)!important;border:1px solid rgba(255,255,255,.4)!important;box-shadow:0 12px 34px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
-html[data-theme=dark] body.dash .card,html[data-theme=dark] body.dash .wrap>p.mu,html[data-theme=dark] body.dash .who{background:rgba(8,16,26,.5)!important;border-color:rgba(255,255,255,.3)!important}
-body.dash .wrap>p.mu{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.85);padding:10px 14px;border-radius:12px;font-size:13px}
-body.dash .card,body.dash .card h2,body.dash .card h3,body.dash .card h4,body.dash .card p,body.dash .card th,body.dash .card td,body.dash .card .mu,body.dash .card label:not(.fl),body.dash .card dt,body.dash .card dd,body.dash .card li,body.dash .card small,body.dash .who,body.dash .who *:not(a):not(button){color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 8px rgba(0,0,0,.4)}
-body.dash .card h2{font-weight:700}
-body.dash .card th,body.dash .card td{border-color:rgba(255,255,255,.28)!important}
-body.dash .card a:not(.btn):not(.nav):not(.on),body.dash .who a,body.dash .who button.lk{color:#cfe6ff!important;text-shadow:0 1px 3px rgba(0,0,0,.85)}
-body.dash .card .b{text-shadow:none!important}
-body.dash .card input,body.dash .card select,body.dash .card textarea{background:rgba(255,255,255,.93)!important;color:#10202b!important;border:1px solid rgba(255,255,255,.9);text-shadow:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-body.dash .card input[type=checkbox],body.dash .card input[type=radio]{box-shadow:none}
-body.dash .card input::placeholder{color:#6b7a89}
-html[data-theme=dark] body.dash .card input,html[data-theme=dark] body.dash .card select,html[data-theme=dark] body.dash .card textarea{background:rgba(8,16,26,.62)!important;color:#fff!important;border-color:rgba(255,255,255,.45)}
-body.dash .card .btn.s,body.dash .card button.s{background:rgba(255,255,255,.93);color:#14417b!important;border-color:#fff;text-shadow:none}
-html[data-theme=dark] body.dash .card .btn.s,html[data-theme=dark] body.dash .card button.s{background:rgba(23,33,44,.92);color:#cfe3ff!important;border-color:rgba(255,255,255,.4)}
-body.dash .card button:not(.s):not(.eye){text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.35)}
-body.dash .card .stat,body.dash .chips a{background:rgba(255,255,255,.14)!important;border-color:rgba(255,255,255,.4)!important;color:#fff!important}
-body.dash .card .stat b,body.dash .card .stat span{color:#fff!important}
-body.dash .chips a.on,body.dash .chips a:hover{background:#2d6a4f!important}
-body.dash .sc td,body.dash .cal td{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.3)!important}
-body.dash .sc td.off{background:rgba(0,0,0,.18)}body.dash .sc td:hover:not(.off){background:rgba(255,255,255,.22)}
-body.dash .sc th,body.dash .sc-leg,body.dash .sc-more,body.dash .dn{color:#fff!important}
-body.dash .sc-ev{background:rgba(255,255,255,.12)}
-body.dash table.rpm tr{background:rgba(255,255,255,.10)!important;border-color:rgba(255,255,255,.35)!important}
-body.dash table.rpm td::before{color:rgba(255,255,255,.82)!important;text-shadow:0 1px 3px rgba(0,0,0,.8)}
-body.dash .rp-code,body.dash .rp-photo,body.dash .rp-tl>*{background:rgba(255,255,255,.12)!important;border-color:rgba(255,255,255,.35)!important}
-body.dash .wrap>p>a,body.dash .wrap>a{color:#fff!important;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.6)}
-body.dash .tabs a:not(.on){background:rgba(255,255,255,.93)!important;color:#14417b!important}
-@supports selector(:has(*)){
- body.dash .card label.fl{color:#4b5b6b!important;text-shadow:none!important;font-weight:600!important}
- body.dash .card label.fl.up,body.dash .card label.fl:has(+ input:focus),body.dash .card label.fl:has(+ select:focus),body.dash .card label.fl:has(+ textarea:focus),body.dash .card label.fl:has(+ .pw input:focus),body.dash .card label.fl:has(+ input:not(:placeholder-shown)),body.dash .card label.fl:has(+ textarea:not(:placeholder-shown)),body.dash .card label.fl:has(+ .pw input:not(:placeholder-shown)){color:#fff!important;font-weight:700!important;text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.6)!important}
- html[data-theme=dark] body.dash .card label.fl{color:#b8c7d6!important}
- html[data-theme=dark] body.dash .card label.fl.up,html[data-theme=dark] body.dash .card label.fl:has(+ input:focus),html[data-theme=dark] body.dash .card label.fl:has(+ select:focus),html[data-theme=dark] body.dash .card label.fl:has(+ textarea:focus),html[data-theme=dark] body.dash .card label.fl:has(+ input:not(:placeholder-shown)),html[data-theme=dark] body.dash .card label.fl:has(+ textarea:not(:placeholder-shown)){color:#67e8f9!important}
-}
-"""
-_b = T["base.html"]
-_b = _b.replace("</style>" + RP_THEME_INIT, RP_DASH_CSS + "</style>" + RP_THEME_INIT, 1)
-T["base.html"] = _b
 
-# ---- 9. No browser auto-fill on Sign In / Create an account ---------------------------------------------------------------
-RP_NOFILL_JS = """<script>(function(){var f=document.querySelector('form.auth');if(!f||!f.querySelector('[name=username]')||/forgot/.test(location.pathname))return;
-f.setAttribute('autocomplete','off');var ins=[].slice.call(f.querySelectorAll('input')).filter(function(i){return i.type!=='hidden'});
-ins.forEach(function(i){i.setAttribute('autocomplete',i.type==='password'?'new-password':'off');i.setAttribute('autocapitalize','off');i.setAttribute('spellcheck','false');i.readOnly=true;
-var u=function(){i.readOnly=false};['focus','mousedown','touchstart'].forEach(function(e){i.addEventListener(e,u)});
-['keydown','paste','input'].forEach(function(e){i.addEventListener(e,function(ev){if(ev.isTrusted)i.dataset.t='1'})})});
-function wipe(){ins.forEach(function(i){if(!i.dataset.t&&i.value!==i.defaultValue)i.value=i.defaultValue})}
-[50,300,800,1600,3000].forEach(function(t){setTimeout(wipe,t)});window.addEventListener('pageshow',wipe)})();</script>"""
+# ---- 9. No browser autofill on Sign In / Create account ------------------------------------------------------------------
+RP_NOFILL_JS = """<script>(function(){function go(){try{var fs=document.querySelectorAll('form.auth');if(!fs.length||/forgot/.test(location.pathname))return;
+fs.forEach(function(f){if(!f.querySelector('[name=username]'))return;f.setAttribute('autocomplete','off');
+f.querySelectorAll('input').forEach(function(i){var t=(i.type||'').toLowerCase();if(/^(hidden|submit|button|checkbox)$/.test(t))return;
+i.setAttribute('autocomplete',t==='password'?'new-password':'off');i.readOnly=true;
+var un=function(){i.readOnly=false};i.addEventListener('focus',un);i.addEventListener('mousedown',un);i.addEventListener('touchstart',un,{passive:true});
+['keydown','paste','input'].forEach(function(ev){i.addEventListener(ev,function(e){if(e.isTrusted)i.dataset.t='1'})});
+function wipe(){if(!i.dataset.t&&i.value)i.value=''}[50,300,800,1600,3000].forEach(function(ms){setTimeout(wipe,ms)});window.addEventListener('pageshow',wipe)})})}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go()})();</script>"""
+_b = T["base.html"]; _b = _b.replace("</body></html>", RP_NOFILL_JS + "</body></html>", 1); T["base.html"] = _b
+
+# ---- 10. Filters apply by themselves (no Apply/Show button) + slightly smaller Prev/Today/Next buttons ---------------------
+RP_AUTO_CSS = """
+form.rp-auto button{display:none!important}
+.sc-bar>.btn,.rbar>.btn{padding:5px 12px!important;font-size:13px!important;line-height:1.25;min-height:32px;margin:0}
+@media(max-width:700px){.sc-bar>.btn,.rbar>.btn{min-height:38px!important}}
+"""
+RP_AUTO_JS = """<script>(function(){function go(){try{document.querySelectorAll('form.sc-bar,form.rf').forEach(function(f){f.classList.add('rp-auto');var tm=null;
+f.querySelectorAll('select').forEach(function(s){s.addEventListener('change',function(){f.requestSubmit()})});
+f.querySelectorAll('input[type=month],input[type=date]').forEach(function(i){i.addEventListener('change',function(){clearTimeout(tm);tm=setTimeout(function(){var v=i.value;if(!v||parseInt(v.slice(0,4),10)<2000)return;f.requestSubmit()},350)})})})}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go()})();</script>"""
 _b = T["base.html"]
-_b = _b.replace("</body></html>", RP_NOFILL_JS + "</body></html>", 1)
-T["base.html"] = _b
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_AUTO_CSS + "</style>" + RP_THEME_INIT, 1)
+_b = _b.replace("</body></html>", RP_AUTO_JS + "</body></html>", 1); T["base.html"] = _b
+
+# ---- 11. White cards on the dashboards + smaller Cancel / Back buttons --------------------------------------------------------
+RP_SM_CSS = """
+html:not([data-theme=dark]) .dash .card{background:#fff!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+.rpsm{padding:5px 13px!important;font-size:13px!important;min-height:32px!important;line-height:1.2!important;margin-top:0!important;vertical-align:middle;width:auto!important;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.auth .rpsm{margin-top:24px!important;margin-left:8px;vertical-align:top}
+@media(max-width:700px){.rpsm{min-height:36px!important}}
+"""
+RP_SM_JS = """<script>(function(){function go(){try{document.querySelectorAll('a.btn,button').forEach(function(b){if(b.classList.contains('s')&&/^\\s*(Cancel|Back)/i.test(b.textContent||''))b.classList.add('rpsm')})}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(go,0)});else setTimeout(go,0);
+new MutationObserver(function(){go()}).observe(document.documentElement,{childList:true,subtree:true})})();</script>"""
+_b = T["base.html"]
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_SM_CSS + "</style>" + RP_THEME_INIT, 1)
+_b = _b.replace("</body></html>", RP_SM_JS + "</body></html>", 1); T["base.html"] = _b
+
+# ---- 12. New time picker (hour / minute chips in a pop-up, AM|PM switch) - drives the old Hour/Min/AM selects, so nothing else changes ----
+RP_TP_CSS = """
+.tpk{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:46px;margin:22px 0 0!important;padding:0 14px!important;background:var(--bg);color:var(--tx);border:1px solid var(--bd)!important;border-radius:6px;font:inherit;font-size:15px;font-weight:600;text-align:left;box-shadow:none!important;transform:none!important;min-height:46px!important}
+.tpk:hover:not(:disabled){background:var(--bg)!important;border-color:#22d3ee!important;transform:none!important}
+.tpk .tv.ph{color:#8a97a5;font-weight:500}.tpk svg{width:20px;height:20px;stroke:#0e7490;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+label.tpl{display:block;font-size:12px!important;font-weight:700!important;color:#0e7490!important;margin-bottom:-18px;position:relative;z-index:1}
+.tpp{position:absolute;z-index:9999;width:292px;max-width:calc(100vw - 16px);background:#fff;color:#1b2a38;border:1px solid #cdd7e1;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.28);padding:14px}
+.tpp .am{display:flex;background:#eef2f6;border-radius:999px;padding:3px;margin-bottom:12px}
+.tpp .am button,.tpp .g button{background:transparent;color:inherit;border:0;box-shadow:none!important;transform:none!important;margin:0;padding:0;min-height:0!important;font:inherit;cursor:pointer}
+.tpp .am button{flex:1;padding:8px 0;border-radius:999px;font-weight:700;font-size:14px;color:#5b6b7b}
+.tpp .am button.on{background:#14417b;color:#fff}
+.tpp h6{margin:0 0 6px;font:700 11px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#6b7a89}
+.tpp .g{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:12px}
+.tpp .g button{height:38px;border-radius:10px;border:1px solid #d5dee7;background:#f6f8fa;font-weight:600;font-size:14px}
+.tpp .g button:hover{background:#e3f4f8!important;border-color:#22d3ee;transform:none!important}
+.tpp .g button.on{background:#0e7490!important;color:#fff!important;border-color:#0e7490}
+.tpp .ft{display:flex;justify-content:space-between;gap:8px}.tpp .ft button{margin:0;min-height:34px!important;padding:6px 16px;font-size:13px;border-radius:8px}
+.tpbg{display:none}
+@media(max-width:700px){.tpp{position:fixed;left:0!important;right:0;bottom:0;top:auto!important;width:auto;max-width:none;border-radius:18px 18px 0 0;padding:16px 16px 20px}.tpp .g button{height:44px}
+ .tpbg{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998}}
+html[data-theme=dark] .tpp{background:#17212c;color:#e6edf4;border-color:#33465a}html[data-theme=dark] .tpp .am{background:#0f1720}html[data-theme=dark] .tpp .am button{color:#9fb0c0}
+html[data-theme=dark] .tpp .g button{background:#1f2c3a;border-color:#33465a;color:#e6edf4}html[data-theme=dark] .tpp h6{color:#9fb0c0}html[data-theme=dark] .tpp .g button:hover{background:#264055!important}
+"""
+RP_TP_JS = """<script>(function(){var open=null;
+function close(){if(open){open.p.remove();if(open.bg)open.bg.remove();open=null}}
+function build(tp){var s=tp.querySelectorAll('select');if(s.length<3||tp.dataset.k)return;tp.dataset.k='1';var H=s[0],M=s[1],P=s[2];
+ tp.style.display='none';var lab=tp.parentNode.querySelector('label');if(lab)lab.classList.add('tpl');
+ var b=document.createElement('button');b.type='button';b.className='tpk';b.setAttribute('aria-haspopup','dialog');
+ b.innerHTML='<span class="tv"></span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';tp.parentNode.insertBefore(b,tp);
+ var tv=b.firstChild;function show(){var ok=H.value&&M.value!=='';tv.textContent=ok?H.value+':'+M.value+' '+P.value:'Select time';tv.className='tv'+(ok?'':' ph')}show();
+ function fire(){tp.querySelector('select').dispatchEvent(new Event('change'))}
+ function openP(){close();var bg=null,p=document.createElement('div');p.className='tpp';p.setAttribute('role','dialog');
+  if(window.innerWidth<=700){bg=document.createElement('div');bg.className='tpbg';bg.onclick=close;document.body.appendChild(bg)}
+  var h='<div class="am"><button type="button" data-p="AM">AM</button><button type="button" data-p="PM">PM</button></div><h6>Hour</h6><div class="g" data-k="h">';
+  for(var i=1;i<=12;i++)h+='<button type="button" data-v="'+i+'">'+i+'</button>';
+  h+='</div><h6>Minute</h6><div class="g" data-k="m">';
+  [].forEach.call(M.options,function(o){if(o.value!=='')h+='<button type="button" data-v="'+o.value+'">'+o.value+'</button>'});
+  h+='</div><div class="ft"><button type="button" class="s" data-a="clear">Clear</button><button type="button" data-a="done">Done</button></div>';p.innerHTML=h;document.body.appendChild(p);
+  function mark(){p.querySelectorAll('.am button').forEach(function(x){x.classList.toggle('on',x.dataset.p===P.value)});
+   p.querySelectorAll('[data-k=h] button').forEach(function(x){x.classList.toggle('on',x.dataset.v===H.value)});
+   p.querySelectorAll('[data-k=m] button').forEach(function(x){x.classList.toggle('on',x.dataset.v===M.value)})}mark();
+  p.addEventListener('click',function(e){var t=e.target.closest('button');if(!t)return;e.stopPropagation();
+   if(t.dataset.p){P.value=t.dataset.p}
+   else if(t.parentNode.dataset.k==='h'){H.value=t.dataset.v;if(M.value==='')M.value='00'}
+   else if(t.parentNode.dataset.k==='m'){M.value=t.dataset.v;if(H.value==='')H.value='12'}
+   else if(t.dataset.a==='clear'){H.value='';M.value=''}
+   else if(t.dataset.a==='done'){fire();show();close();return}
+   fire();show();mark();if(t.parentNode.dataset.k==='m'){close()}});
+  var r=b.getBoundingClientRect();if(!bg){var top=r.bottom+window.scrollY+6,left=r.left+window.scrollX;left=Math.max(8,Math.min(left,window.scrollX+document.documentElement.clientWidth-300));p.style.top=top+'px';p.style.left=left+'px'}
+  open={p:p,bg:bg}}
+ b.addEventListener('click',function(e){e.stopPropagation();if(open)close();else openP()});
+ M.addEventListener('change',show)}
+function go(){document.querySelectorAll('.tp').forEach(build)}
+document.addEventListener('click',function(e){if(open&&!open.p.contains(e.target))close()});document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(go,0)});else setTimeout(go,0)})();</script>"""
+_b = T["base.html"]
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_TP_CSS + "</style>" + RP_THEME_INIT, 1)
+_b = _b.replace("</body></html>", RP_TP_JS + "</body></html>", 1); T["base.html"] = _b
+
 
 # ---- 3. Backup & export of all data (admin) -----------------------------------------------------------------------
 RP_BK = [("requests", "id,rfu_no,user_id,requester,dept,event,event_date,t1,t2,return_date,attendees,facilities,head,status,remarks,created_at,returned_at", "requests"),
