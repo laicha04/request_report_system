@@ -1322,7 +1322,7 @@ def rp_gzip(resp):
 def rp_login_button(resp):
     try:
         if request.endpoint == "login" and resp.status_code == 200 and resp.mimetype == "text/html":
-            btn = ('<div class="rp-lr"><div class="rp-lq">Report broken equipment?</div><a class="rp-lb" href="%s">Click here</a></div>' % url_for("rp_form"))
+            btn = ('<div class="rp-lr"><div class="rp-lq">Report damage equipment?</div><a class="rp-lb" href="%s">Report Here</a></div>' % url_for("rp_form"))
             resp.set_data(resp.get_data(as_text=True).replace("</form>", btn + "</form>", 1))
     except Exception:
         pass
