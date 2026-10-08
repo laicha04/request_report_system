@@ -1855,6 +1855,92 @@ _b = _b.replace("</style>" + RP_THEME_INIT, RP_TP_CSS + "</style>" + RP_THEME_IN
 _b = _b.replace("</body></html>", RP_TP_JS + "</body></html>", 1); T["base.html"] = _b
 
 
+
+# ---- 13. Terms and Conditions page + "I agree" checkboxes (Create Account, Request form) + note on the damage-report form ----------
+T["terms.html"] = """{% extends 'base.html' %}{% block body %}<style>.tc h4{margin:18px 0 6px;color:var(--pr)}.tc ol{margin:0;padding-left:22px}.tc li{margin:5px 0}.tc{line-height:1.55}</style>
+<div class="card rp-narrow tc" style="max-width:760px"><h2>Terms and Conditions</h2>
+<p class="mu" style="font-size:14px">General Services Office (GSO) - Southern Luzon State University, Judge Guillermo Eleazar. Please read before using this system.</p>
+<h4 id="requests">A. Facility and equipment requests</h4><ol>
+<li>Submitting a request does not guarantee approval. The GSO must approve it first.</li>
+<li>Give correct dates, times and quantities. A request with wrong or missing information may be declined.</li>
+<li>The requester is responsible for all borrowed equipment and for the facility used, from pick-up until it is returned.</li>
+<li>Return equipment and facilities on the date and time stated in the request. Late returns may affect your future requests.</li>
+<li>If an item is damaged or lost while under your care, you are responsible for repairing or replacing it, following the school's policy.</li>
+<li>Use the facility or equipment only for the purpose stated in the request. Do not lend it to other people.</li>
+<li>The GSO may cancel or move an approved request for an emergency or an important school activity.</li>
+<li>Attach a valid I.D. and contact number when the request form is printed, and get the signature of your department head when required.</li></ol>
+<h4 id="reports">B. Reporting broken or damaged equipment</h4><ol>
+<li>Use the report form only for real damage or hazards. False or prank reports may be rejected.</li>
+<li>Give the exact location and a clear description so the GSO can find and fix the problem.</li>
+<li>Mark a report as urgent only for safety hazards, such as exposed wires or leaks.</li>
+<li>A report does not mean the repair will be immediate; it depends on the GSO's schedule and available budget.</li>
+<li>Photos must show only school property. Do not upload pictures of other people.</li></ol>
+<h4 id="privacy">C. Privacy and accounts</h4><ol>
+<li>The system collects your name, student number, contact details and request or report information. The GSO uses them only to process and follow up your request or report.</li>
+<li>Your information is not shared outside the school, except when required by an official process.</li></ol>
+<p style="margin-top:20px"><a class="btn s" href="javascript:history.length>1?history.back():location.href='/'">Back</a></p></div>{% endblock %}"""
+
+_i = T["terms.html"].index("<h4 id=\"requests\">"); _j = T["terms.html"].index('<p style="margin-top:20px">')
+from markupsafe import Markup as _Mk
+app.jinja_env.globals["TERMS_BODY"] = _Mk(T["terms.html"][_i:_j])
+
+RP_TC_MODAL = """<div id="tcBg" class="tcbg" hidden><div class="tcm" role="dialog" aria-modal="true" aria-labelledby="tcT"><h3 id="tcT">Terms and Conditions</h3>
+<div id="tcBody" class="tcb tc">{{ TERMS_BODY }}</div><p id="tcHint" class="tch">Scroll down to the end to enable the button.</p>
+<div class="tcf"><button type="button" class="s rpsm" id="tcNo">Cancel</button><button type="button" id="tcYes" disabled>I have read and I agree</button></div></div></div>
+<style>.tcbg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:12px}.tcbg[hidden]{display:none}
+.tcm{background:#fff;color:#1b2a38;border-radius:14px;max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;padding:18px 18px 14px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.tcm h3{margin:0 0 8px;font:600 21px Georgia,serif;color:#14417b}.tcb{overflow:auto;flex:1;border:1px solid #d5dee7;border-radius:8px;padding:4px 14px 12px;font-size:14.5px;max-height:58vh;-webkit-overflow-scrolling:touch}
+.tcb h4{margin:14px 0 6px;color:#14417b}.tcb ol{margin:0;padding-left:20px}.tcb li{margin:5px 0}.tch{margin:8px 0 0;font-size:13px;color:#8a4b00}.tch.ok{color:#1e6b3a}
+.tcf{display:flex;justify-content:space-between;gap:10px;margin-top:10px}.tcf button{margin:0!important}.tcf #tcYes:disabled{opacity:.45;cursor:not-allowed}
+html[data-theme=dark] .tcm{background:#17212c;color:#e6edf4}html[data-theme=dark] .tcm h3,html[data-theme=dark] .tcb h4{color:#8ab4ff}html[data-theme=dark] .tcb{border-color:#33465a}html[data-theme=dark] .tch{color:#f0b866}html[data-theme=dark] .tch.ok{color:#7ee0a0}</style>
+<script>(function(){var cb=document.getElementById('tcAgree');if(!cb)return;var bg=document.getElementById('tcBg'),bd=document.getElementById('tcBody'),yes=document.getElementById('tcYes'),hint=document.getElementById('tcHint'),f=cb.form;
+function chk(){if(bd.scrollTop+bd.clientHeight>=bd.scrollHeight-6){yes.disabled=false;hint.textContent='Thank you. You can now agree.';hint.className='tch ok'}}
+function show(){bg.hidden=false;document.body.style.overflow='hidden';bd.scrollTop=0;if(!cb.checked){yes.disabled=true;hint.textContent='Scroll down to the end to enable the button.';hint.className='tch'}setTimeout(chk,60)}
+function hide(){bg.hidden=true;document.body.style.overflow=''}
+bd.addEventListener('scroll',chk);document.getElementById('tcNo').onclick=hide;bg.addEventListener('click',function(e){if(e.target===bg)hide()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!bg.hidden)hide()});
+yes.onclick=function(){cb.checked=true;hide()};
+cb.addEventListener('click',function(e){if(cb.checked){e.preventDefault();cb.checked=false;show()}});
+document.querySelectorAll('.tclink').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();show()})});
+if(f)f.addEventListener('submit',function(e){if(!cb.checked){e.preventDefault();show();setTimeout(function(){f.querySelectorAll('button').forEach(function(x){x.disabled=false})},30)}})})();</script>"""
+
+@app.route("/terms")
+def terms_page():
+    return render_template("terms.html", page_sub="General Services Office - Terms and Conditions")
+
+_AGREE = ('<div class="ck" style="margin-top:12px"><label><input type="checkbox" name="agree" value="1" required> <span>I have read and agree to the '
+          '<a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a></span></label></div>')
+
+_AGREE2 = ('<div class="ck" style="margin-top:12px"><label><input type="checkbox" id="tcAgree" name="agree" value="1"> <span>I have read and agree to the '
+           '<a href="/terms" class="tclink">Terms and Conditions</a></span></label></div>')
+
+@app.before_request
+def rp_need_agree():
+    if request.method == "POST" and request.endpoint in ("signup", "new_request", "rp_form") and not request.form.get("agree"):
+        flash("Please tick the box to agree to the Terms and Conditions first.", "err")
+        return redirect(url_for({"signup": "signup", "rp_form": "rp_form"}.get(request.endpoint, "dashboard")))
+
+_s = T["signup.html"]; assert "<button>Create Account</button>" in _s
+T["signup.html"] = _s.replace("<button>Create Account</button>", _AGREE2 + "<button>Create Account</button>", 1)
+_s = T["signup.html"]; _k = _s.rindex("{% endblock %}"); T["signup.html"] = _s[:_k] + RP_TC_MODAL + _s[_k:]
+_s = T["student.html"]; assert "<button>Submit Request</button></form>" in _s
+T["student.html"] = _s.replace("<button>Submit Request</button></form>", _AGREE + "<button>Submit Request</button></form>", 1)
+_s = T["rp_form.html"]; assert '<button class="sub">Submit report</button>' in _s
+_s = _s.replace('<button class="sub">Submit report</button>', _AGREE2 + '<button class="sub">Submit report</button>', 1)
+_k = _s.rindex("{% endblock %}"); T["rp_form.html"] = _s[:_k] + RP_TC_MODAL + _s[_k:]
+T["base.html"] = T["base.html"].replace("'rp_form', 'rp_done', 'rp_track', 'login',", "'rp_form', 'rp_done', 'rp_track', 'terms_page', 'login',", 1)
+
+@app.after_request
+def rp_terms_link(resp):
+    try:
+        if request.endpoint == "login" and resp.status_code == 200 and resp.mimetype == "text/html":
+            lk = '<div style="text-align:center;margin:14px 0 24px"><a href="/terms" style="color:#fff;font:600 13px system-ui,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.6)">Terms and Conditions</a></div>'
+            resp.set_data(resp.get_data(as_text=True).replace("</body>", lk + "</body>", 1))
+    except Exception:
+        pass
+    return resp
+
+
 # ---- 3. Backup & export of all data (admin) -----------------------------------------------------------------------
 RP_BK = [("requests", "id,rfu_no,user_id,requester,dept,event,event_date,t1,t2,return_date,attendees,facilities,head,status,remarks,created_at,returned_at", "requests"),
          ("request_items", "id,request_id,name,qty", "items"),
