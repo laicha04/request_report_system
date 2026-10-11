@@ -1,24 +1,4 @@
-#!/usr/bin/env python3
-"""
-SLSU - Judge Guillermo Eleazar | Facility & Equipment Request System
-Single-file Flask application.  Database: Supabase (PostgreSQL) when DATABASE_URL is set,
-otherwise a local SQLite file (rfu.db) so you can still test on your own computer.
 
-SETUP (local)
-    pip install -r requirements.txt
-    copy .env.example to .env and put your Supabase connection string in DATABASE_URL
-    python APP_1.py                -> open http://127.0.0.1:5000
-SETUP (Render)  Start command: gunicorn APP_1:app   |  Environment: DATABASE_URL, SECRET_KEY
-
-FIRST LOGIN
-    username: admin    password: admin123   (you MUST change it on first login)
-    Forgot the admin password?  ->  python app.py reset-admin
-
-OPTIONAL ENVIRONMENT VARIABLES
-    Equipment: the admin adds all equipment and quantities in the "Equipment Stock" tab.
-    DATABASE_URL=postgresql://...  SECRET_KEY=...  RFU_ADMIN_PASSWORD=...  TZ_HOURS=8  (RFU_DB/HOST/PORT for local use)
-For real deployment use HTTPS and a WSGI server, e.g.:  pip install waitress ; waitress-serve --port=8000 app:app
-"""
 import os, io, re, sys, csv, json, time, base64, secrets, sqlite3
 from xml.sax.saxutils import escape as xml_escape
 from calendar import Calendar, monthrange
@@ -35,7 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader, simpleSplit
 
-try:                                    # read variables from a local .env file (ignored when not installed / on Render)
+try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
@@ -51,10 +31,7 @@ FACILITIES = ["Audio Visual Room (AVR)", "Administration Building Lobby", "Cover
 OLD_DEFAULTS = [("Sound System", 2), ("Table", 30), ("Chair", 200), ("Microphone", 6), ("Projector", 3)]  # removed automatically once
 BG_FILE = "image.jpg"   # <- PALITAN DITO ANG PANGALAN NG BACKGROUND IMAGE (jpg/png/webp). Ilagay ang file sa tabi ng app.py o sa "static" folder. Iwanang "" kung walang background.
 def _bg_path():
-    """Finds the background image. Looks in the app folder, ./static and the working folder, and is forgiving:
-    exact name first, then the same name in any upper/lower case (BG.JPG), then the same name with another image
-    extension (bg.png / bg.jpeg / bg.webp). Linux (Render) is case-sensitive, Windows is not - that is why a
-    file that works on your PC can be 'missing' online."""
+
     if not BG_FILE:
         return None
     here = os.path.dirname(os.path.abspath(__file__))
@@ -63,11 +40,11 @@ def _bg_path():
         if _d not in _dirs and os.path.isdir(_d):
             _dirs.append(_d)
     _want = BG_FILE.lower(); _stem = os.path.splitext(_want)[0]
-    for _d in _dirs:                                   # 1) exact name
+    for _d in _dirs:                              
         _p = os.path.join(_d, BG_FILE)
         if os.path.isfile(_p):
             return _p
-    for _d in _dirs:                                   # 2) same name, any case   3) same name, any image extension
+    for _d in _dirs:                          
         try:
             _names = os.listdir(_d)
         except OSError:
@@ -194,7 +171,6 @@ ICONS = {
  "eyeoff": '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
 }
 
-# ---- 12-hour (AM/PM) display helpers, used by the pages and the PDF
 def t12(t):
     try: return datetime.strptime(t, "%H:%M").strftime("%I:%M %p").lstrip("0")
     except Exception: return t or ""
@@ -211,7 +187,6 @@ def dt12(s_):
     return (dfmt(s_[:10]) + " " + t12(s_[11:16])).strip()
 
 def _migrate():
-    """Older databases: add the new 'return_date' column (date the facility/equipment will be returned)."""
     if USE_PG:
         ex("ALTER TABLE requests ADD COLUMN IF NOT EXISTS return_date TEXT")
     elif "return_date" not in [c["name"] for c in q("PRAGMA table_info(requests)")]:
