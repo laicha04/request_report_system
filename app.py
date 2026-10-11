@@ -49,15 +49,37 @@ if USE_PG:
 DB_PATH = os.environ.get("RFU_DB", os.path.join(BASE, "rfu.db"))
 FACILITIES = ["Audio Visual Room (AVR)", "Administration Building Lobby", "Covered Court", "Classroom"]
 OLD_DEFAULTS = [("Sound System", 2), ("Table", 30), ("Chair", 200), ("Microphone", 6), ("Projector", 3)]  # removed automatically once
-BG_FILE = "image.jpg"   # <- PALITAN DITO ANG PANGALAN NG BACKGROUND IMAGE (jpg/png/webp). Ilagay ang file sa tabi ng app.py o sa "static" folder. Iwanang "" kung walang background.
+BG_FILE = "bg.jpg"   # <- PALITAN DITO ANG PANGALAN NG BACKGROUND IMAGE (jpg/png/webp). Ilagay ang file sa tabi ng app.py o sa "static" folder. Iwanang "" kung walang background.
 def _bg_path():
+    """Finds the background image. Looks in the app folder, ./static and the working folder, and is forgiving:
+    exact name first, then the same name in any upper/lower case (BG.JPG), then the same name with another image
+    extension (bg.png / bg.jpeg / bg.webp). Linux (Render) is case-sensitive, Windows is not - that is why a
+    file that works on your PC can be 'missing' online."""
     if not BG_FILE:
         return None
     here = os.path.dirname(os.path.abspath(__file__))
-    for _p in (os.path.join(here, BG_FILE), os.path.join(here, "static", BG_FILE), os.path.join(os.getcwd(), BG_FILE)):
+    _dirs = []
+    for _d in (here, os.path.join(here, "static"), os.getcwd(), os.path.join(os.getcwd(), "static")):
+        if _d not in _dirs and os.path.isdir(_d):
+            _dirs.append(_d)
+    _want = BG_FILE.lower(); _stem = os.path.splitext(_want)[0]
+    for _d in _dirs:                                   # 1) exact name
+        _p = os.path.join(_d, BG_FILE)
         if os.path.isfile(_p):
             return _p
+    for _d in _dirs:                                   # 2) same name, any case   3) same name, any image extension
+        try:
+            _names = os.listdir(_d)
+        except OSError:
+            continue
+        for _n in _names:
+            if _n.lower() == _want and os.path.isfile(os.path.join(_d, _n)):
+                return os.path.join(_d, _n)
+        for _n in _names:
+            if os.path.splitext(_n)[0].lower() == _stem and _n.lower().endswith((".jpg", ".jpeg", ".png", ".webp")) and os.path.isfile(os.path.join(_d, _n)):
+                return os.path.join(_d, _n)
     return None
+print("[bg] background image:", _bg_path() or "NOT FOUND (looked for '%s' next to the app and in ./static)" % BG_FILE, flush=True)
 def _bg_response(data, mimetype, etag):
     r = Response(data, mimetype=mimetype)
     r.set_etag(etag)
