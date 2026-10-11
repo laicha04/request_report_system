@@ -49,7 +49,7 @@ if USE_PG:
 DB_PATH = os.environ.get("RFU_DB", os.path.join(BASE, "rfu.db"))
 FACILITIES = ["Audio Visual Room (AVR)", "Administration Building Lobby", "Covered Court", "Classroom"]
 OLD_DEFAULTS = [("Sound System", 2), ("Table", 30), ("Chair", 200), ("Microphone", 6), ("Projector", 3)]  # removed automatically once
-BG_FILE = "bg.jpg"   # <- PALITAN DITO ANG PANGALAN NG BACKGROUND IMAGE (jpg/png/webp). Ilagay ang file sa tabi ng app.py o sa "static" folder. Iwanang "" kung walang background.
+BG_FILE = "image.jpg"   # <- PALITAN DITO ANG PANGALAN NG BACKGROUND IMAGE (jpg/png/webp). Ilagay ang file sa tabi ng app.py o sa "static" folder. Iwanang "" kung walang background.
 def _bg_path():
     """Finds the background image. Looks in the app folder, ./static and the working folder, and is forgiving:
     exact name first, then the same name in any upper/lower case (BG.JPG), then the same name with another image
