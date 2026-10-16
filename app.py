@@ -687,7 +687,7 @@ def new_request():
         clear_bad(v, e)
         ctx = student_ctx("new")
         ctx.update(v=v, e=e, old_items=rows, old_fac=fac,
-                   summary="Please fix the highlighted items. Only the incorrect entries were cleared - everything else was kept.")
+                   summary="Please fix/fill the highlighted items.")
         return render_template("student.html", **ctx)
     c = ex("""INSERT INTO requests(user_id,requester,dept,event,event_date,t1,t2,attendees,facilities,head,created_at,return_date)
               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""", g.user["id"], v["requester"][:120], v["dept"][:120], v["event"][:160], d, t1, t2,
@@ -2399,6 +2399,87 @@ T["base.html"] = T["base.html"].replace("'terms_page',", "'terms_page', 'survey_
 
 
 
+# ---- 15. The request form looks like the printed R.F.U. form (style only: the fields, names and scripts are untouched) ----
+RFU_PAPER = """
+<style>
+form.rfu{max-width:860px;margin-left:auto;margin-right:auto;background:var(--card);border:1.5px solid currentColor;border-radius:4px}
+form.rfu>h2{text-align:center;font:700 17px/1.3 Georgia,serif;letter-spacing:.3px;margin:6px 0 14px;text-transform:uppercase}
+.rfu-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}.rfu-h img{width:clamp(46px,11vw,76px);height:auto;flex:none}
+.rfu-h div{text-align:center;line-height:1.25;min-width:0}.rfu-h b{display:block;font:700 clamp(14px,3.6vw,20px)/1.2 Georgia,serif}.rfu-h i{display:block;font-style:normal;font-size:clamp(11px,2.8vw,13px)}
+.rfu-no{width:max-content;margin:0 0 12px auto;border:1.5px solid currentColor;padding:4px 10px;font-size:12.5px}.rfu-no span{display:inline-block;min-width:80px;border-bottom:1px solid currentColor;margin-left:6px;font-size:11px;opacity:.7}
+html body form.rfu .g{display:grid;grid-template-columns:repeat(12,1fr);gap:12px 18px}
+html body form.rfu .g>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;grid-column:span 12}
+html body form.rfu .g>div:nth-child(1){grid-column:span 8;order:1}html body form.rfu .g>div:nth-child(2){grid-column:span 4;order:2}
+html body form.rfu .g>div:nth-child(3){order:3}html body form.rfu .g>div:nth-child(4){order:4}
+html body form.rfu .g>div:nth-child(5){grid-column:span 7;order:5}html body form.rfu .g>div:nth-child(9){grid-column:span 5;order:6}
+html body form.rfu .g>div:nth-child(7){grid-column:span 6;order:7}html body form.rfu .g>div:nth-child(8){grid-column:span 6;order:8}
+html body form.rfu .g>div:nth-child(6){grid-column:span 7;order:9}
+html body form.rfu label.fl,html body form.rfu label{position:static!important;transform:none!important;height:auto!important;width:auto!important;max-width:none!important;margin:0!important;padding:0;overflow:visible!important;
+ white-space:nowrap;font-size:14px!important;font-weight:500!important;line-height:1.3;color:inherit!important;pointer-events:auto;text-shadow:none!important;display:inline-block}
+html body form.rfu label.fl.fl.fl{color:inherit!important;font-size:14px!important;transform:none!important}
+html body form.rfu .g>div>label+input,html body form.rfu .g>div>label+.tp,html body form.rfu>input,html body form.rfu .erow input,html body form.rfu .erow select,html body form.rfu .tp select{
+ margin:0!important;height:auto!important;min-height:26px;padding:2px 4px!important;border:0!important;border-bottom:1.5px solid currentColor!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;font-size:14px;color:inherit}
+html body form.rfu .g>div>input:not([type=hidden]),html body form.rfu .g>div>.tp{flex:1 1 90px;min-width:0;width:auto}
+html body form.rfu .g>div>input:focus,html body form.rfu>input:focus,html body form.rfu .erow input:focus,html body form.rfu select:focus{border-bottom-color:#0e7490!important;background:rgba(14,116,144,.07)!important}
+html body form.rfu .g>div>input:disabled{opacity:1;-webkit-text-fill-color:currentColor}
+html body form.rfu .g>div>.tpk{flex:1 1 110px;width:auto;height:auto!important;min-height:26px;margin:0!important;padding:2px 4px!important;background:transparent!important;border:0!important;border-bottom:1.5px solid currentColor!important;border-radius:0!important;box-shadow:none!important;font-size:14px}
+html body form.rfu .g>div>.tpk .tv{font-weight:400}html body form.rfu .g>div>.tpk svg{width:17px;height:17px}
+html body form.rfu>label,html body form.rfu>label.fl{display:block!important}
+html body form.rfu .fe{flex-basis:100%}html body form.rfu .tp{display:flex;gap:4px}
+form.rfu>label:not(.fl):first-of-type{margin-top:0}
+html body form.rfu>label{display:block;margin:16px 0 6px!important;font-weight:700!important}
+html body form.rfu .ck{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin:2px 0 8px 14px}
+html body form.rfu .ck label{display:flex;align-items:center;gap:8px;margin:0!important;font-weight:400!important;white-space:normal;cursor:pointer}
+html body form.rfu .ck input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:none;width:20px;height:20px;margin:0!important;border:1.6px solid currentColor;border-radius:2px;background:var(--card);position:relative;cursor:pointer}
+html body form.rfu .ck input[type=checkbox]:checked::after{content:"X";position:absolute;inset:0;display:grid;place-items:center;font:700 15px/1 Arial,sans-serif;color:#0e7490}
+html body form.rfu .ck input[type=checkbox]:disabled{opacity:.45;cursor:not-allowed}
+html body form.rfu>input[name=fac_other]{width:calc(100% - 14px);margin-left:14px!important}
+html body form.rfu #eq{margin:2px 0 8px 14px}html body form.rfu .erow{gap:10px}
+html body form.rfu button.s{margin-left:14px}
+.rfu-eq{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 26px;margin:2px 0 6px 14px}.rfu-eq label{margin:0!important;font-weight:400!important}
+html body form.rfu .rfu-sd{display:inline-flex!important;align-items:center;gap:8px;cursor:pointer}
+html body form.rfu .rfu-sd input{position:absolute;opacity:0;width:0;height:0}.rfu-sd i{flex:none;width:20px;height:20px;border:1.6px solid currentColor;border-radius:2px;background:var(--card);position:relative}
+.rfu-sd input:checked+i::after{content:"X";position:absolute;inset:0;display:grid;place-items:center;font:700 15px/1 Arial,sans-serif;color:#0e7490}.rfu-sd input:focus-visible+i{outline:2px solid #22d3ee}.rfu-sd input:disabled+i{opacity:.45}
+html body form.rfu .rfu-n input{width:84px;text-align:center;font-weight:700;margin:0!important;padding:2px 4px!important;border:0!important;border-bottom:1.5px solid currentColor!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;height:auto!important;color:inherit}
+.rfu-eq em{font-style:normal;font-size:11.5px;opacity:.75;white-space:nowrap}.rfu-ot{margin:8px 0 2px 14px;font-weight:500}
+.rfu-f{margin:16px 0 0;font-size:11.5px;opacity:.75}
+@media(max-width:640px){html body form.rfu .g{grid-template-columns:1fr}html body form.rfu .g>div:nth-child(n){grid-column:auto}html body form.rfu .ck{grid-template-columns:1fr}
+ html body form.rfu>label,html body form.rfu>label.fl{white-space:normal!important}html body form.rfu button.s{margin-left:14px;max-width:calc(100% - 14px)}html body form.rfu .erow{flex-wrap:wrap}html body form.rfu .erow select,html body form.rfu .erow input{flex:1 1 100%;min-width:0}html body form.rfu .erow input[name=item_qty]{flex:1 1 60%}html body form.rfu .erow button.r{flex:none;min-width:40px;padding:6px 12px}}
+</style>
+<script>(function(){var f=document.querySelector('form.card[action$="/request"]');if(!f||f.classList.contains('rfu'))return;f.classList.add('rfu');
+var L={requester:"Requester's Name:",dept:'College/Department:',event:'Name/Type of Event:',event_date:'Date of the Event:',return_date:'Date to be Returned:',t1:'Time Reserved:',t2:'to',attendees:'Estimated Attendees:'};
+f.querySelectorAll('.g>div').forEach(function(d,i){var lb=d.querySelector('label'),inp=d.querySelector('[name]');if(!lb)return;var req=/\\*/.test(lb.textContent);
+ var t=inp&&L[inp.name]||(i==1?'Date:':null);if(t){lb.textContent=t;if(req){var s=document.createElement('span');s.textContent=' *';s.style.color='#c0392b';lb.appendChild(s)}}});
+var h2=f.querySelector('h2');if(h2){h2.textContent='Request for Facility/Equipment Use';var hd=document.createElement('div');hd.className='rfu-h';
+ hd.innerHTML='<img src="/logo/1.png" alt=""><div><b>Southern Luzon State University</b><b style="font-size:clamp(12px,3vw,16px)">Judge Guillermo Eleazar</b><i>GENERAL SERVICES OFFICE</i><i>Tagkawayan, Quezon</i></div><img src="/logo/2.png" alt="">';
+ h2.parentNode.insertBefore(hd,h2);var no=document.createElement('div');no.className='rfu-no';no.innerHTML='R.F.U. No:<span>(given after you submit)</span>';h2.parentNode.insertBefore(no,h2)}
+var lbs=f.querySelectorAll(':scope>label');lbs.forEach(function(l){var x=l.textContent.trim();if(x=='Facility to be used')l.textContent='Facility to be used:';if(x=='Equipment')l.innerHTML='<i>Equipment</i>';
+ if(/^Requested by/.test(x))l.textContent='Requested by (College Department/Department Head) - optional:'});
+var fo=f.querySelector('[name=fac_other]');if(fo)fo.placeholder='others (specify)';
+var ft=document.createElement('p');ft.className='rfu-f';ft.innerHTML='<b>AFA-GSO-1.01F8, Rev. 0</b><br>Effective 11/08/24';f.appendChild(ft);
+/* equipment line like the paper: [ ] Sound System   Table ___   Chair ___   Other: (anything else the GSO added to the list) */
+var eq=f.querySelector('#eq');if(!eq)return;var DEF=['Sound System','Table','Chair'],HID={};
+var bx=document.createElement('div');bx.className='rfu-eq';
+bx.innerHTML='<label class="rfu-sd"><input type="checkbox" id="rq0"><i></i><span>Sound System</span><em></em></label><label class="rfu-n">Table <input type="number" min="0" id="rq1" inputmode="numeric"><em></em></label><label class="rfu-n">Chair <input type="number" min="0" id="rq2" inputmode="numeric"><em></em></label>';
+var pm=eq.previousElementSibling;eq.parentNode.insertBefore(bx,eq);
+var ot=document.createElement('div');ot.className='rfu-ot';ot.textContent='Other:';eq.parentNode.insertBefore(ot,eq);
+DEF.forEach(function(n,i){var h=document.createElement('span');h.hidden=true;h.innerHTML='<input type="hidden" name="item_name" value="'+n+'"><input type="hidden" name="item_qty"><input type="hidden" name="item_other" value="">';bx.appendChild(h);HID[n]=h});
+function ctl(i){return document.getElementById('rq'+i)}
+function sync(){DEF.forEach(function(n,i){var c=ctl(i),q=i==0?(c.checked?1:0):(parseInt(c.value,10)||0),h=HID[n].querySelectorAll('input');h[1].value=q;h.forEach(function(x){x.disabled=q<=0})})}
+bx.addEventListener('input',sync);bx.addEventListener('change',sync);f.addEventListener('submit',sync,true);sync();
+var addb=[].find.call(f.querySelectorAll('button.s'),function(b){return /Add equipment/.test(b.textContent)});if(addb)addb.textContent='+ Add other equipment';
+var first=true,old=(typeof HAS_ERR!=='undefined'&&HAS_ERR&&typeof OLD_ITEMS!=='undefined'&&OLD_ITEMS.length);
+new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(r){if(!r.classList||!r.classList.contains('erow'))return;var sel=r.querySelector('select'),qt=r.querySelector('[name=item_qty]'),k=DEF.indexOf(sel.value);
+ if(k>=0&&old){var c=ctl(k);if(k==0)c.checked=true;else c.value=(parseInt(c.value,10)||0)+(parseInt(qt.value,10)||0);sync();r.remove();return}
+ if(first&&!old){first=false;r.remove();return}first=false;
+ [].slice.call(sel.options).forEach(function(o){if(DEF.indexOf(o.value)>=0)o.remove()});
+ if(sel.selectedIndex<0&&sel.options.length)sel.selectedIndex=0;if(typeof paint==='function')paint()})})}).observe(eq,{childList:true});
+/* show how many are left for the chosen date/time, and block more than that */
+setInterval(function(){if(typeof AV==='undefined'||!AV.left)return;DEF.forEach(function(n,i){var l=AV.left[n],c=ctl(i),em=c.parentNode.querySelector('em');if(l===undefined){em.textContent='';return}
+ em.textContent=l>0?' ('+l+' left)':' - OUT OF STOCK';if(i==0){c.disabled=!(l>0);if(!(l>0)&&c.checked){c.checked=false;sync()}}else{c.max=l;c.disabled=!(l>0);if(+c.value>l){c.value=l>0?l:'';sync()}}})},600)})();</script>
+"""
+T["student.html"] = T["student.html"].replace("{% elif tab == 'mine' %}", RFU_PAPER + "{% elif tab == 'mine' %}", 1)
+
 RP_SCREEN_CSS = """
 /* dashboards use the whole screen: the background covers every screen size, the content grows with it (the menu tab keeps 60px free on each side) */
 html,body{min-height:100%}body.authbg::before,body.dash::before{background-size:cover;background-position:center}
@@ -2600,6 +2681,17 @@ var t=today.slice(0,7)===ym?parseInt(today.slice(8),10):1;selDay(t)})()</script>
 
 
 rp_init()
+def rfu_seed_defaults():
+    """Sound System, Table and Chair are on the paper form, so they are in the equipment list from the start (once). The GSO edits the numbers and adds the rest."""
+    with app.app_context():
+        try:
+            if q1("SELECT 1 FROM meta WHERE key='paper_defaults'"): return
+            for n, st in (("Sound System", 2), ("Table", 30), ("Chair", 200)):
+                ex("INSERT INTO inventory(name,stock) SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE name=?)", n, st, n)
+            ex("INSERT INTO meta VALUES('paper_defaults','1')")
+        except Exception as err:
+            print("rfu_seed_defaults note:", err)
+rfu_seed_defaults()
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "reset-admin":
