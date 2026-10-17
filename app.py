@@ -687,7 +687,7 @@ def new_request():
         clear_bad(v, e)
         ctx = student_ctx("new")
         ctx.update(v=v, e=e, old_items=rows, old_fac=fac,
-                   summary="Please fix/fill the highlighted items.")
+                   summary="Please fix the highlighted items. Only the incorrect entries were cleared - everything else was kept.")
         return render_template("student.html", **ctx)
     c = ex("""INSERT INTO requests(user_id,requester,dept,event,event_date,t1,t2,attendees,facilities,head,created_at,return_date)
               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""", g.user["id"], v["requester"][:120], v["dept"][:120], v["event"][:160], d, t1, t2,
@@ -2178,6 +2178,14 @@ T["survey.html"] = """{% extends 'rp_base.html' %}{% block rp %}{% import 'macro
 .csm table.csmg td .ck input:checked+i::after{left:6px;top:0;width:7px;height:14px}
 .csm table.csmg td:has(input:checked){background:rgba(14,116,144,.14)}
 .csm textarea.ul{width:100%;min-height:70px;border:0;background-image:repeating-linear-gradient(transparent,transparent 27px,currentColor 27px,currentColor 28px);line-height:28px;padding:0 4px;font-size:14px;border-bottom:0}
+.csm .r3{gap:8px 28px}.csm .f{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+@media(max-width:560px){.csm .r3{flex-direction:column;align-items:stretch;gap:12px}.csm .f{width:100%}.csm .f .ul{flex:1 1 auto;min-width:0;width:auto!important}.csm .row .ul{min-width:0}.csm .row[style],.csm .row{gap:10px 14px}
+.csm .row>em{min-width:0}.csm .row .ul[name=region],.csm .row .ul[name=service],.csm .row .ul[name=email]{flex:1 1 100%!important}}
+@media(max-width:560px){.csm{padding:16px 14px}.csm .row{gap:2px 12px;margin:12px 0}.csm .row .ul,.csm .f .ul{height:auto!important;min-height:34px;margin:0!important;font-size:16px;padding:4px 4px!important}
+.csm .row:has(.ul[name=region]),.csm .row:has(.ul[name=email]){display:block}.csm .row:has(.ul[name=region])>em,.csm .row:has(.ul[name=email])>em{display:block;margin-bottom:2px}
+.csm .row .ul[name=region],.csm .row .ul[name=service],.csm .row .ul[name=email]{display:block;width:100%!important;flex:none!important}.csm .row:has(.ul[name=region])>em:nth-of-type(2){margin-top:14px}
+.csm .ck{font-size:15px;min-height:34px;align-items:center}.csm .ck i{width:22px;height:22px}.csm .ck input:checked+i::after{left:6px;top:1px}.csm .f .ck{margin-right:12px!important}
+.csm .row:has(input[name=client_type]){gap:10px 18px}.csm .row:has(input[name=client_type])>em{flex:1 1 100%}.csm button.sub{width:100%;margin:14px 0 8px}.csm .btn{display:block;text-align:center}.csm textarea.ul{font-size:16px}}
 @media(max-width:560px){.csm table.csmg td.t{font-size:11.5px;padding:4px}.csm table.csmg th{font-size:8.5px}.csm table.csmg th svg{width:22px;height:22px}.csm table.csmg td .ck i{width:19px;height:19px}.csm .q{grid-template-columns:36px 1fr}}
 </style>
 <form class="card csm" method="post" onsubmit="var b=this.querySelector('button.sub');setTimeout(function(){b.disabled=true},0)">{{ m.token() }}
@@ -2188,9 +2196,9 @@ T["survey.html"] = """{% extends 'rp_base.html' %}{% block rp %}{% import 'macro
 {% if err %}<div class="msg err">{{ err }}</div>{% endif %}
 <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
 <div class="row"><em>Client type:</em>{% for k, t in clients %}<label class="ck"><input type="radio" name="client_type" value="{{ k }}" {{ 'checked' if v.get('client_type') == k }} required><i></i>{{ t }}</label>{% endfor %}</div>
-<div class="row"><em>Date:</em><input class="ul" value="{{ today }}" disabled size="10">
-<em style="min-width:0">Sex:</em>{% for x in sexes %}<label class="ck"><input type="radio" name="sex" value="{{ x }}" {{ 'checked' if v.get('sex') == x }}><i></i>{{ x }}</label>{% endfor %}
-<em style="min-width:0">Age:</em><input class="ul" name="age" type="number" min="1" max="120" inputmode="numeric" value="{{ v.get('age', '') }}" style="width:70px"></div>
+<div class="row r3"><div class="f"><em>Date:</em><input class="ul" value="{{ today }}" disabled size="10"></div>
+<div class="f"><em style="min-width:0">Sex:</em>{% for x in sexes %}<label class="ck"><input type="radio" name="sex" value="{{ x }}" {{ 'checked' if v.get('sex') == x }}><i></i>{{ x }}</label>{% endfor %}</div>
+<div class="f"><em style="min-width:0">Age:</em><input class="ul" name="age" type="number" min="1" max="120" inputmode="numeric" value="{{ v.get('age', '') }}" style="width:70px"></div></div>
 <div class="row"><em style="min-width:0">Region of residence:</em><input class="ul" name="region" maxlength="80" value="{{ v.get('region', '') }}" style="flex:1;min-width:140px">
 <em style="min-width:0">Service Availed:</em><input class="ul" name="service" maxlength="120" value="{{ v.get('service', '') }}" required style="flex:2;min-width:160px"></div>
 <hr><p style="font-size:13px;margin:6px 0">{{ ins1 }}</p>
