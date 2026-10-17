@@ -1470,12 +1470,12 @@ def rp_gzip(resp):
         pass
     return resp
 
-# "Report broken equipment?" prompt + "Click here" button, placed under the sign-in box (login page code is not edited).
+# "Report broken equipment?" prompt + "Report here" button, placed under the sign-in box (login page code is not edited).
 @app.after_request
 def rp_login_button(resp):
     try:
         if request.endpoint == "login" and resp.status_code == 200 and resp.mimetype == "text/html":
-            btn = ('<div class="rp-lr"><div class="rp-lq">Report broken equipment?</div><a class="rp-lb" href="%s">Click here</a></div>' % url_for("rp_form"))
+            btn = ('<div class="rp-lr"><div class="rp-lq">Report broken equipment?</div><a class="rp-lb" href="%s">Report here</a></div>' % url_for("rp_form"))
             resp.set_data(resp.get_data(as_text=True).replace("</form>", btn + "</form>", 1))
     except Exception:
         pass
