@@ -38,7 +38,7 @@ from logos import LOGOS   # the long base64 logo strings live in logos.py (push 
 #   Upper / lower case does not matter, and PNG / JPG / WEBP of any size work.  Render redeploys by itself after you commit to GitHub.
 #   (The two header logos are built in. To use other logos, put files named like LOGO_LEFT / LOGO_RIGHT in the same folder.)
 # =====================================================================================================================
-IMAGE_FOLDER = "static"
+IMAGE_FOLDER = "images"
 BACKGROUND = "image.jpg"
 LOGO_LEFT = ""
 LOGO_RIGHT = ""
@@ -1470,12 +1470,12 @@ def rp_gzip(resp):
         pass
     return resp
 
-# "Report broken equipment?" prompt + "Report here" button, placed under the sign-in box (login page code is not edited).
+# "Report broken equipment?" prompt + "Click here" button, placed under the sign-in box (login page code is not edited).
 @app.after_request
 def rp_login_button(resp):
     try:
         if request.endpoint == "login" and resp.status_code == 200 and resp.mimetype == "text/html":
-            btn = ('<div class="rp-lr"><div class="rp-lq">Report broken equipment?</div><a class="rp-lb" href="%s">Report here</a></div>' % url_for("rp_form"))
+            btn = ('<div class="rp-lr"><div class="rp-lq">Report broken equipment?</div><a class="rp-lb" href="%s">Click here</a></div>' % url_for("rp_form"))
             resp.set_data(resp.get_data(as_text=True).replace("</form>", btn + "</form>", 1))
     except Exception:
         pass
@@ -2698,6 +2698,50 @@ def rfu_seed_defaults():
             ex("INSERT INTO meta VALUES('paper_defaults','1')")
         except Exception as err:
             print("rfu_seed_defaults note:", err)
+# ---- 16. After sign-in: full-screen centered interface, icon rail navigation (names show on hover), top bar navigation on phones ----
+RP_RAIL_CSS = """
+/* ===== icon rail (desktop / tablet) ===== */
+@media(min-width:701px){
+ .menubtn,.sideBg{display:none!important}
+ body.dash .side{transform:none!important;width:60px;top:0;bottom:0;left:0;border-radius:0;background:#161616;color:#e5e5e5;box-shadow:none;border-right:1px solid #2a2a2a;overflow-x:hidden;overflow-y:auto;z-index:70;transition:width .22s ease,box-shadow .22s ease;scrollbar-width:none}
+ body.dash .side:hover,body.dash .side:focus-within{width:236px;box-shadow:8px 0 30px rgba(0,0,0,.35)}
+ body.dash .side .sideuser{padding:14px 10px;border-bottom:1px solid #2a2a2a;gap:12px;min-height:66px}
+ body.dash .side .sideuser .x{display:none}body.dash .side .av{width:38px;height:38px;font-size:17px;flex:none}
+ body.dash .side .who2,body.dash .side a.nav span,body.dash .side .signout span,body.dash .side .navlabel{opacity:0;white-space:nowrap;transition:opacity .15s ease}
+ body.dash .side:hover .who2,body.dash .side:hover a.nav span,body.dash .side:hover .signout span,body.dash .side:hover .navlabel,
+ body.dash .side:focus-within .who2,body.dash .side:focus-within a.nav span,body.dash .side:focus-within .signout span,body.dash .side:focus-within .navlabel{opacity:1;transition-delay:.06s}
+ body.dash .side .navlabel{padding:12px 20px 4px;height:30px;overflow:hidden;color:#8a8a8a;border-top:1px solid #2a2a2a;margin-top:6px}body.dash .side .sideuser+.navlabel{border-top:0;margin-top:0}
+ body.dash .side a.nav{margin:2px 9px;padding:10px 12px;gap:14px;border-radius:8px;color:#d4d4d4;font-weight:500;font-size:14.5px;overflow:hidden}
+ body.dash .side a.nav svg,body.dash .side .signout svg{width:20px;height:20px;flex:none}
+ body.dash .side a.nav:hover{background:#242424;transform:none;color:#fff}body.dash .side a.nav.on{background:#2b2b2b;color:#fff;box-shadow:none}
+ body.dash .side .cnt{background:#3a3a3a;color:#fff;font-size:11px;padding:0 7px;margin-left:auto}
+ body.dash .side .foot{border-top:1px solid #2a2a2a;padding:8px 0 12px}
+ body.dash .side .signout{margin:2px 9px;width:calc(100% - 18px);padding:10px 12px;justify-content:flex-start;gap:14px;background:transparent;border:0;border-radius:8px;color:#d4d4d4;font-weight:500;font-size:14.5px;overflow:hidden}
+ body.dash .side .signout:hover{background:#3a1f1f;color:#fff}
+ /* full screen, centered */
+ body.dash header{padding-left:70px}
+ body.dash .wrap{max-width:none!important;width:100%;margin:18px 0!important;padding:0 clamp(16px,3vw,44px) 0 calc(60px + clamp(16px,3vw,44px))!important}
+ body.dash .wrap>*{max-width:1560px;margin-left:auto;margin-right:auto}
+}
+/* ===== phone: the navigation sits on top of the page, in the flow, so it never covers the form ===== */
+@media(max-width:700px){
+ .menubtn,.sideBg{display:none!important}
+ body.dash .wrap{padding:0 10px!important;margin:10px auto!important;max-width:none!important}
+ body.dash .side{position:sticky!important;top:0;left:auto;bottom:auto;transform:none!important;width:auto;max-width:none;display:flex;flex-direction:row;align-items:stretch;gap:2px;margin:0 0 12px;padding:4px;border-radius:12px;background:#161616;color:#e5e5e5;box-shadow:0 4px 14px rgba(0,0,0,.28);overflow-x:auto;overflow-y:hidden;z-index:60;scrollbar-width:none}
+ body.dash .side::-webkit-scrollbar{display:none}
+ body.dash .side .sideuser,body.dash .side .navlabel{display:none}
+ body.dash .side a.nav,body.dash .side .signout{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:54px;margin:0;padding:7px 4px;border-radius:9px;color:#d4d4d4;font-size:10.5px;font-weight:500;background:transparent;border:0;position:relative;transform:none;text-align:center;line-height:1.15;white-space:normal}
+ body.dash .side a.nav svg,body.dash .side .signout svg{width:20px;height:20px}
+ body.dash .side a.nav.on{background:#2b2b2b;color:#fff;box-shadow:none}body.dash .side a.nav:hover{transform:none;background:#242424}
+ body.dash .side .cnt{position:absolute;top:2px;right:6px;margin:0;padding:0 5px;font-size:10px;background:#c0392b;color:#fff;border-radius:10px}
+ body.dash .side .foot{display:flex;flex:2 1 0;margin:0;padding:0;border:0;gap:2px}body.dash .side .foot form{margin:0;display:flex;flex:1 1 0}body.dash .side .foot>a.nav,body.dash .side .foot .signout{flex:1 1 0}
+ body.dash .bell{top:auto;bottom:16px;right:14px}
+}
+"""
+_b = T["base.html"]
+_b = _b.replace("</style>" + RP_THEME_INIT, RP_RAIL_CSS + "</style>" + RP_THEME_INIT, 1)
+T["base.html"] = _b
+
 rfu_seed_defaults()
 
 if __name__ == "__main__":
