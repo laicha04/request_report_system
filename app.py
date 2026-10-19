@@ -406,7 +406,7 @@ def forgot():
         if is_locked(key): bad(e, "username", "Too many failed attempts. Please wait 5 minutes.")
         elif not u: bad(e, "username", "Username is required.")
         elif not r: bad(e, "username", "No account found with that username."); wrong = True
-        elif r["role"] == "admin": bad(e, "username", "Admin passwords cannot be reset here. Run 'python app.py reset-admin' on the server.")
+        elif r["role"] == "admin": return redirect(url_for("forgot_admin"))
         else:
             if r["fullname"].strip().lower() != v["fullname"].strip().lower(): bad(e, "fullname", "Full name does not match our records."); wrong = True
             if r["student_no"].strip() != v["student_no"].strip(): bad(e, "student_no", "Student number does not match our records."); wrong = True
@@ -1003,7 +1003,7 @@ T["signup.html"] = """{% extends 'base.html' %}{% block body %}{% import 'macros
 <label>Confirm password</label><input name="confirm" type="password" value="{{ v.get('confirm', '') }}">{{ m.fe(e, 'confirm') }}
 <button>Create Account</button><a class="btn s" href="{{ url_for('login') }}">Back</a></form>{% endblock %}"""
 T["forgot.html"] = """{% extends 'base.html' %}{% block body %}{% import 'macros.html' as m %}<form class="card auth" method="post"><h2>Forgot Password</h2>{{ m.token() }}
-<p class="mu">Enter the details you registered with to verify your identity. Admin accounts must be reset on the server.</p>
+<p class="mu">Enter the details you registered with to verify your identity. Admin? <a href="/forgot/admin">Use the admin recovery page</a>.</p>
 <label>Username</label><input name="username" value="{{ v.get('username', '') }}">{{ m.fe(e, 'username') }}
 <label>Full name</label><input name="fullname" value="{{ v.get('fullname', '') }}">{{ m.fe(e, 'fullname') }}
 <label>Student number</label><input name="student_no" value="{{ v.get('student_no', '') }}">{{ m.fe(e, 'student_no') }}
@@ -2450,7 +2450,10 @@ html body form.rfu .rfu-sd input{position:absolute;opacity:0;width:0;height:0}.r
 html body form.rfu .rfu-n input{width:84px;text-align:center;font-weight:700;margin:0!important;padding:2px 4px!important;border:0!important;border-bottom:1.5px solid currentColor!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;height:auto!important;color:inherit}
 .rfu-eq em{font-style:normal;font-size:11.5px;opacity:.75;white-space:nowrap}.rfu-ot{margin:8px 0 2px 14px;font-weight:500}
 .rfu-f{margin:16px 0 0;font-size:11.5px;opacity:.75}
-@media(max-width:640px){html body form.rfu .g{grid-template-columns:1fr}html body form.rfu .g>div:nth-child(n){grid-column:auto}html body form.rfu .ck{grid-template-columns:1fr}
+@media(max-width:640px){html body form.rfu .rfu-eq{display:grid;grid-template-columns:1fr;gap:10px;margin-left:0}
+ html body form.rfu .rfu-eq .rfu-n{display:grid;grid-template-columns:52px 120px auto;justify-content:start;align-items:center;gap:0 10px}html body form.rfu .rfu-eq .rfu-n input{width:100%;font-size:16px}
+ html body form.rfu .rfu-eq .rfu-sd{display:grid;grid-template-columns:22px auto 1fr;align-items:center;gap:0 10px;min-height:30px}.rfu-ot{margin-left:0}html body form.rfu #eq{margin-left:0}
+ html body form.rfu .g{grid-template-columns:1fr}html body form.rfu .g>div:nth-child(n){grid-column:auto}html body form.rfu .ck{grid-template-columns:1fr}
  html body form.rfu>label,html body form.rfu>label.fl{white-space:normal!important}html body form.rfu button.s{margin-left:14px;max-width:calc(100% - 14px)}html body form.rfu .erow{flex-wrap:wrap}html body form.rfu .erow select,html body form.rfu .erow input{flex:1 1 100%;min-width:0}html body form.rfu .erow input[name=item_qty]{flex:1 1 60%}html body form.rfu .erow button.r{flex:none;min-width:40px;padding:6px 12px}}
 </style>
 <script>(function(){var f=document.querySelector('form.card[action$="/request"]');if(!f||f.classList.contains('rfu'))return;f.classList.add('rfu');
@@ -2703,21 +2706,21 @@ RP_RAIL_CSS = """
 /* ===== icon rail (desktop / tablet) ===== */
 @media(min-width:701px){
  .menubtn,.sideBg{display:none!important}
- body.dash .side{transform:none!important;width:60px;top:0;bottom:0;left:0;border-radius:0;background:#161616;color:#e5e5e5;box-shadow:none;border-right:1px solid #2a2a2a;overflow-x:hidden;overflow-y:auto;z-index:70;transition:width .22s ease,box-shadow .22s ease;scrollbar-width:none}
+ body.dash .side{transform:none!important;width:60px;top:0;bottom:0;left:0;border-radius:0;background:linear-gradient(185deg,#14532d 0%,#1b4332 55%,#0f3d2a 100%);color:#e8f5ec;box-shadow:none;border-right:1px solid rgba(255,255,255,.14);overflow-x:hidden;overflow-y:auto;z-index:70;transition:width .22s ease,box-shadow .22s ease;scrollbar-width:none}
  body.dash .side:hover,body.dash .side:focus-within{width:236px;box-shadow:8px 0 30px rgba(0,0,0,.35)}
- body.dash .side .sideuser{padding:14px 10px;border-bottom:1px solid #2a2a2a;gap:12px;min-height:66px}
+ body.dash .side .sideuser{padding:14px 10px;border-bottom:1px solid rgba(255,255,255,.14);gap:12px;min-height:66px}
  body.dash .side .sideuser .x{display:none}body.dash .side .av{width:38px;height:38px;font-size:17px;flex:none}
  body.dash .side .who2,body.dash .side a.nav span,body.dash .side .signout span,body.dash .side .navlabel{opacity:0;white-space:nowrap;transition:opacity .15s ease}
  body.dash .side:hover .who2,body.dash .side:hover a.nav span,body.dash .side:hover .signout span,body.dash .side:hover .navlabel,
  body.dash .side:focus-within .who2,body.dash .side:focus-within a.nav span,body.dash .side:focus-within .signout span,body.dash .side:focus-within .navlabel{opacity:1;transition-delay:.06s}
- body.dash .side .navlabel{padding:12px 20px 4px;height:30px;overflow:hidden;color:#8a8a8a;border-top:1px solid #2a2a2a;margin-top:6px}body.dash .side .sideuser+.navlabel{border-top:0;margin-top:0}
- body.dash .side a.nav{margin:2px 9px;padding:10px 12px;gap:14px;border-radius:8px;color:#d4d4d4;font-weight:500;font-size:14.5px;overflow:hidden}
+ body.dash .side .navlabel{padding:12px 20px 4px;height:30px;overflow:hidden;color:#95d5b2;border-top:1px solid rgba(255,255,255,.14);margin-top:6px}body.dash .side .sideuser+.navlabel{border-top:0;margin-top:0}
+ body.dash .side a.nav{margin:2px 9px;padding:10px 12px;gap:14px;border-radius:12px;color:#d8f3dc;font-weight:600;font-size:14.5px;overflow:hidden}
  body.dash .side a.nav svg,body.dash .side .signout svg{width:20px;height:20px;flex:none}
- body.dash .side a.nav:hover{background:#242424;transform:none;color:#fff}body.dash .side a.nav.on{background:#2b2b2b;color:#fff;box-shadow:none}
- body.dash .side .cnt{background:#3a3a3a;color:#fff;font-size:11px;padding:0 7px;margin-left:auto}
- body.dash .side .foot{border-top:1px solid #2a2a2a;padding:8px 0 12px}
- body.dash .side .signout{margin:2px 9px;width:calc(100% - 18px);padding:10px 12px;justify-content:flex-start;gap:14px;background:transparent;border:0;border-radius:8px;color:#d4d4d4;font-weight:500;font-size:14.5px;overflow:hidden}
- body.dash .side .signout:hover{background:#3a1f1f;color:#fff}
+ body.dash .side a.nav:hover{background:rgba(255,255,255,.12);transform:none;color:#fff}body.dash .side a.nav.on{background:linear-gradient(90deg,#c9a227,#e6c453);color:#173a1f;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+ body.dash .side .cnt{background:rgba(255,255,255,.2);color:inherit;font-size:11px;padding:0 7px;margin-left:auto}
+ body.dash .side .foot{border-top:1px solid rgba(255,255,255,.14);padding:8px 0 12px}
+ body.dash .side .signout{margin:2px 9px;width:calc(100% - 18px);padding:10px 12px;justify-content:flex-start;gap:14px;background:rgba(255,255,255,.08);border:0;border-radius:12px;color:#fff;font-weight:600;font-size:14.5px;overflow:hidden}
+ body.dash .side .signout:hover{background:#a63232;color:#fff}
  /* full screen, centered */
  body.dash header{padding-left:70px}
  body.dash .wrap{max-width:none!important;width:100%;margin:18px 0!important;padding:0 clamp(16px,3vw,44px) 0 calc(60px + clamp(16px,3vw,44px))!important}
@@ -2727,13 +2730,14 @@ RP_RAIL_CSS = """
 @media(max-width:700px){
  .menubtn,.sideBg{display:none!important}
  body.dash .wrap{padding:0 10px!important;margin:10px auto!important;max-width:none!important}
- body.dash .side{position:sticky!important;top:0;left:auto;bottom:auto;transform:none!important;width:auto;max-width:none;display:flex;flex-direction:row;align-items:stretch;gap:2px;margin:0 0 12px;padding:4px;border-radius:12px;background:#161616;color:#e5e5e5;box-shadow:0 4px 14px rgba(0,0,0,.28);overflow-x:auto;overflow-y:hidden;z-index:60;scrollbar-width:none}
+ body.dash .side{position:sticky!important;top:0;left:auto;bottom:auto;transform:none!important;width:auto;max-width:none;display:flex;flex-direction:row;align-items:stretch;gap:2px;margin:0 0 12px;padding:4px;border-radius:12px;background:linear-gradient(135deg,#14532d,#1b4332);color:#e8f5ec;box-shadow:0 4px 14px rgba(0,0,0,.28);overflow-x:auto;overflow-y:hidden;z-index:60;scrollbar-width:none}
  body.dash .side::-webkit-scrollbar{display:none}
  body.dash .side .sideuser,body.dash .side .navlabel{display:none}
- body.dash .side a.nav,body.dash .side .signout{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:54px;margin:0;padding:7px 4px;border-radius:9px;color:#d4d4d4;font-size:10.5px;font-weight:500;background:transparent;border:0;position:relative;transform:none;text-align:center;line-height:1.15;white-space:normal}
+ body.dash .side a.nav,body.dash .side .signout{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:54px;margin:0;padding:7px 4px;border-radius:9px;color:#d8f3dc;font-size:10.5px;font-weight:600;background:transparent;border:0;position:relative;transform:none;text-align:center;line-height:1.15;white-space:normal}
  body.dash .side a.nav svg,body.dash .side .signout svg{width:20px;height:20px}
- body.dash .side a.nav.on{background:#2b2b2b;color:#fff;box-shadow:none}body.dash .side a.nav:hover{transform:none;background:#242424}
+ body.dash .side a.nav.on{background:linear-gradient(90deg,#c9a227,#e6c453);color:#173a1f;box-shadow:none}body.dash .side a.nav:hover{transform:none;background:rgba(255,255,255,.12)}
  body.dash .side .cnt{position:absolute;top:2px;right:6px;margin:0;padding:0 5px;font-size:10px;background:#c0392b;color:#fff;border-radius:10px}
+ body.dash .side .signout{background:rgba(255,255,255,.08);color:#fff}
  body.dash .side .foot{display:flex;flex:2 1 0;margin:0;padding:0;border:0;gap:2px}body.dash .side .foot form{margin:0;display:flex;flex:1 1 0}body.dash .side .foot>a.nav,body.dash .side .foot .signout{flex:1 1 0}
  body.dash .bell{top:auto;bottom:16px;right:14px}
 }
@@ -2741,6 +2745,52 @@ RP_RAIL_CSS = """
 _b = T["base.html"]
 _b = _b.replace("</style>" + RP_THEME_INIT, RP_RAIL_CSS + "</style>" + RP_THEME_INIT, 1)
 T["base.html"] = _b
+
+# ---- 17. Admin password: recovery page ("Forgot admin password") and a one-time reset from the Render settings ----
+T["forgot_admin.html"] = """{% extends 'base.html' %}{% block body %}{% import 'macros.html' as m %}<form class="card auth" method="post"><h2>Forgot Admin Password</h2>{{ m.token() }}
+{% if not has_code %}<div class="msg err">The recovery code is not set yet. In Render, open your service, go to Environment, add <b>ADMIN_RECOVERY_CODE</b> (any secret words only you know), save, and wait for the redeploy. Then come back here. If you are already locked out, add <b>RESET_ADMIN</b> = 1 instead (see the note on the sign-in help).</div>{% endif %}
+<p class="mu">Enter the admin recovery code (the ADMIN_RECOVERY_CODE saved in the server settings) and choose a new password.</p>
+<label>Recovery code</label><input name="code" type="password" autocomplete="off" value="">{{ m.fe(e, 'code') }}
+<label>New password (min. 8 characters)</label><input name="password" type="password" value="">{{ m.fe(e, 'password') }}
+<label>Confirm new password</label><input name="confirm" type="password" value="">{{ m.fe(e, 'confirm') }}
+<button>Reset admin password</button><a class="btn s" href="{{ url_for('login') }}">Back</a></form>{% endblock %}"""
+T["base.html"] = T["base.html"].replace("'login', 'signup', 'forgot', 'account')", "'login', 'signup', 'forgot', 'forgot_admin', 'account')")
+
+@app.route("/forgot/admin", methods=["GET", "POST"])
+def forgot_admin():
+    e, code = {}, (os.environ.get("ADMIN_RECOVERY_CODE") or "").strip()
+    if request.method == "POST":
+        f = request.form; key = "fa|" + rp_ip()
+        if not code: bad(e, "code", "The recovery code is not set on the server yet.")
+        elif is_locked(key): bad(e, "code", "Too many failed attempts. Please wait 5 minutes.")
+        elif not secrets.compare_digest(f.get("code", "").strip().encode(), code.encode()): bad(e, "code", "Wrong recovery code."); fail(key)
+        if not e:
+            p1, p2 = f.get("password", ""), f.get("confirm", "")
+            if not p1: bad(e, "password", "New password is required.")
+            elif not p2: bad(e, "confirm", "Please confirm your new password.")
+            else: check_pw(e, p1, p2)
+        if not e:
+            FAILS.pop(key, None)
+            if q1("SELECT 1 FROM users WHERE role='admin'"): ex("UPDATE users SET pw_hash=?, must_change=0 WHERE role='admin'", generate_password_hash(p1))
+            else: ex("INSERT INTO users(username,fullname,student_no,pw_hash,role,must_change,created_at) VALUES('admin','GSO Administrator','-',?, 'admin',0,?)", generate_password_hash(p1), now_s())
+            flash("The admin password has been changed. Please sign in.", "ok"); return redirect(url_for("login"))
+    return render_template("forgot_admin.html", e=e, has_code=bool(code))
+
+def rfu_admin_reset():
+    """Locked out? In Render > Environment add RESET_ADMIN = 1 (any new value works each time). On the next start the admin password goes back to RFU_ADMIN_PASSWORD (default admin123) and must be changed at sign-in. It runs once per value, so it does not repeat on every restart."""
+    tok = (os.environ.get("RESET_ADMIN") or "").strip()
+    if not tok: return
+    with app.app_context():
+        try:
+            if q1("SELECT 1 FROM meta WHERE key='admin_reset' AND value=?", tok): return
+            pw = generate_password_hash(os.environ.get("RFU_ADMIN_PASSWORD", "admin123"))
+            if q1("SELECT 1 FROM users WHERE username='admin'"): ex("UPDATE users SET pw_hash=?, must_change=1, role='admin' WHERE username='admin'", pw)
+            else: ex("INSERT INTO users(username,fullname,student_no,pw_hash,role,must_change,created_at) VALUES('admin','GSO Administrator','-',?, 'admin',1,?)", pw, now_s())
+            ex("DELETE FROM meta WHERE key='admin_reset'"); ex("INSERT INTO meta VALUES('admin_reset',?)", tok)
+            FAILS.clear(); print("Admin password was reset (RESET_ADMIN).")
+        except Exception as err:
+            print("rfu_admin_reset note:", err)
+rfu_admin_reset()
 
 rfu_seed_defaults()
 
