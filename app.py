@@ -406,7 +406,7 @@ def forgot():
         if is_locked(key): bad(e, "username", "Too many failed attempts. Please wait 5 minutes.")
         elif not u: bad(e, "username", "Username is required.")
         elif not r: bad(e, "username", "No account found with that username."); wrong = True
-        elif r["role"] == "admin": return redirect(url_for("forgot_admin"))
+        elif r["role"] == "admin": bad(e, "username", "No account found with that username."); wrong = True
         else:
             if r["fullname"].strip().lower() != v["fullname"].strip().lower(): bad(e, "fullname", "Full name does not match our records."); wrong = True
             if r["student_no"].strip() != v["student_no"].strip(): bad(e, "student_no", "Student number does not match our records."); wrong = True
@@ -1003,7 +1003,7 @@ T["signup.html"] = """{% extends 'base.html' %}{% block body %}{% import 'macros
 <label>Confirm password</label><input name="confirm" type="password" value="{{ v.get('confirm', '') }}">{{ m.fe(e, 'confirm') }}
 <button>Create Account</button><a class="btn s" href="{{ url_for('login') }}">Back</a></form>{% endblock %}"""
 T["forgot.html"] = """{% extends 'base.html' %}{% block body %}{% import 'macros.html' as m %}<form class="card auth" method="post"><h2>Forgot Password</h2>{{ m.token() }}
-<p class="mu">Enter the details you registered with to verify your identity. Admin? <a href="/forgot/admin">Use the admin recovery page</a>.</p>
+<p class="mu">Enter the details you registered with to verify your identity. </p>
 <label>Username</label><input name="username" value="{{ v.get('username', '') }}">{{ m.fe(e, 'username') }}
 <label>Full name</label><input name="fullname" value="{{ v.get('fullname', '') }}">{{ m.fe(e, 'fullname') }}
 <label>Student number</label><input name="student_no" value="{{ v.get('student_no', '') }}">{{ m.fe(e, 'student_no') }}
@@ -2704,7 +2704,7 @@ def rfu_seed_defaults():
 # ---- 16. After sign-in: full-screen centered interface, icon rail navigation (names show on hover), top bar navigation on phones ----
 RP_RAIL_CSS = """
 /* ===== icon rail (desktop / tablet) ===== */
-@media(min-width:701px){
+@media(min-width:1px){
  .menubtn,.sideBg{display:none!important}
  body.dash .side{transform:none!important;width:60px;top:0;bottom:0;left:0;border-radius:0;background:linear-gradient(185deg,#14532d 0%,#1b4332 55%,#0f3d2a 100%);color:#e8f5ec;box-shadow:none;border-right:1px solid rgba(255,255,255,.14);overflow-x:hidden;overflow-y:auto;z-index:70;transition:width .22s ease,box-shadow .22s ease;scrollbar-width:none}
  body.dash .side:hover,body.dash .side:focus-within{width:236px;box-shadow:8px 0 30px rgba(0,0,0,.35)}
@@ -2723,32 +2723,34 @@ RP_RAIL_CSS = """
  body.dash .side .signout:hover{background:#a63232;color:#fff}
  /* full screen, centered */
  body.dash header{padding-left:70px}
+ body.dash #themeBtn{left:74px}
  body.dash .wrap{max-width:none!important;width:100%;margin:18px 0!important;padding:0 clamp(16px,3vw,44px) 0 calc(60px + clamp(16px,3vw,44px))!important}
  body.dash .wrap>*{max-width:1560px;margin-left:auto;margin-right:auto}
 }
-/* ===== phone: the navigation sits on top of the page, in the flow, so it never covers the form ===== */
+/* ===== phone: same icon rail on the left; tap the rail (or the avatar) to show the names ===== */
 @media(max-width:700px){
- .menubtn,.sideBg{display:none!important}
- body.dash .wrap{padding:0 10px!important;margin:10px auto!important;max-width:none!important}
- body.dash .side{position:sticky!important;top:0;left:auto;bottom:auto;transform:none!important;width:auto;max-width:none;display:flex;flex-direction:row;align-items:stretch;gap:2px;margin:0 0 12px;padding:4px;border-radius:12px;background:linear-gradient(135deg,#14532d,#1b4332);color:#e8f5ec;box-shadow:0 4px 14px rgba(0,0,0,.28);overflow-x:auto;overflow-y:hidden;z-index:60;scrollbar-width:none}
- body.dash .side::-webkit-scrollbar{display:none}
- body.dash .side .sideuser,body.dash .side .navlabel{display:none}
- body.dash .side a.nav,body.dash .side .signout{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:54px;margin:0;padding:7px 4px;border-radius:9px;color:#d8f3dc;font-size:10.5px;font-weight:600;background:transparent;border:0;position:relative;transform:none;text-align:center;line-height:1.15;white-space:normal}
- body.dash .side a.nav svg,body.dash .side .signout svg{width:20px;height:20px}
- body.dash .side a.nav.on{background:linear-gradient(90deg,#c9a227,#e6c453);color:#173a1f;box-shadow:none}body.dash .side a.nav:hover{transform:none;background:rgba(255,255,255,.12)}
- body.dash .side .cnt{position:absolute;top:2px;right:6px;margin:0;padding:0 5px;font-size:10px;background:#c0392b;color:#fff;border-radius:10px}
- body.dash .side .signout{background:rgba(255,255,255,.08);color:#fff}
- body.dash .side .foot{display:flex;flex:2 1 0;margin:0;padding:0;border:0;gap:2px}body.dash .side .foot form{margin:0;display:flex;flex:1 1 0}body.dash .side .foot>a.nav,body.dash .side .foot .signout{flex:1 1 0}
+ body.dash .side{width:40px}
+ body.dash .side:hover,body.dash .side:focus-within{width:40px;box-shadow:none}
+ body.dash .side.exp,body.dash .side.exp:hover,body.dash .side.exp:focus-within{width:212px;box-shadow:8px 0 30px rgba(0,0,0,.4)}
+ body.dash .side:not(.exp) .who2,body.dash .side:not(.exp) a.nav span,body.dash .side:not(.exp) .signout span,body.dash .side:not(.exp) .navlabel{opacity:0!important}
+ body.dash .side.exp .who2,body.dash .side.exp a.nav span,body.dash .side.exp .signout span,body.dash .side.exp .navlabel{opacity:1!important}
+ body.dash .side .sideuser{padding:8px 5px;min-height:48px}body.dash .side .av{width:30px;height:30px;font-size:14px}
+ body.dash .side a.nav{margin:2px 3px;padding:9px 8px;gap:12px}body.dash .side a.nav svg,body.dash .side .signout svg{width:18px;height:18px}body.dash .side .signout{margin:2px 3px;width:calc(100% - 6px);padding:9px 8px;gap:12px}body.dash .side .foot{padding:6px 0 10px}
+ body.dash header{padding-left:44px}
+ body.dash .wrap{padding:0 10px 0 48px!important;margin:10px 0!important;max-width:none!important;width:100%}
  body.dash .bell{top:auto;bottom:16px;right:14px}
+ body.dash #themeBtn{left:50px;bottom:16px}
 }
 """
 _b = T["base.html"]
 _b = _b.replace("</style>" + RP_THEME_INIT, RP_RAIL_CSS + "</style>" + RP_THEME_INIT, 1)
 T["base.html"] = _b
+T["base.html"] = T["base.html"].replace("</body>", "<script>document.addEventListener('click',function(e){var s=document.getElementById('side');if(!s)return;if(s.contains(e.target)){if(!e.target.closest('a,button.signout'))s.classList.toggle('exp')}else s.classList.remove('exp')})</script></body>", 1)
+
 
 # ---- 17. Admin password: recovery page ("Forgot admin password") and a one-time reset from the Render settings ----
 T["forgot_admin.html"] = """{% extends 'base.html' %}{% block body %}{% import 'macros.html' as m %}<form class="card auth" method="post"><h2>Forgot Admin Password</h2>{{ m.token() }}
-{% if not has_code %}<div class="msg err">The recovery code is not set yet. In Render, open your service, go to Environment, add <b>ADMIN_RECOVERY_CODE</b> (any secret words only you know), save, and wait for the redeploy. Then come back here. If you are already locked out, add <b>RESET_ADMIN</b> = 1 instead (see the note on the sign-in help).</div>{% endif %}
+
 <p class="mu">Enter the admin recovery code (the ADMIN_RECOVERY_CODE saved in the server settings) and choose a new password.</p>
 <label>Recovery code</label><input name="code" type="password" autocomplete="off" value="">{{ m.fe(e, 'code') }}
 <label>New password (min. 8 characters)</label><input name="password" type="password" value="">{{ m.fe(e, 'password') }}
@@ -2756,9 +2758,10 @@ T["forgot_admin.html"] = """{% extends 'base.html' %}{% block body %}{% import '
 <button>Reset admin password</button><a class="btn s" href="{{ url_for('login') }}">Back</a></form>{% endblock %}"""
 T["base.html"] = T["base.html"].replace("'login', 'signup', 'forgot', 'account')", "'login', 'signup', 'forgot', 'forgot_admin', 'account')")
 
-@app.route("/forgot/admin", methods=["GET", "POST"])
+@app.route("/admin-recovery", methods=["GET", "POST"])
 def forgot_admin():
     e, code = {}, (os.environ.get("ADMIN_RECOVERY_CODE") or "").strip()
+    if not code: abort(404)          # not linked anywhere; the page only exists once the admin sets a recovery code
     if request.method == "POST":
         f = request.form; key = "fa|" + rp_ip()
         if not code: bad(e, "code", "The recovery code is not set on the server yet.")
